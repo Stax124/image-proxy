@@ -1,0 +1,12 @@
+[package]
+name = "image-proxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4.13.0"
+anyhow = "1.0.102"
+image = { version = "0.25.10", features = ["nasm", "avif-native"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+webp = "0.3.1"
