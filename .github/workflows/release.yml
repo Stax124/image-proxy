@@ -1,0 +1,57 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+
+env:
+    CARGO_TERM_COLOR: always
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    check-version:
+        name: Ensure Tag Matches Cargo.toml
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v6
+            - name: Check Cargo Version Matches Tag
+              uses: spice-labs-inc/action-check-version@main
+    build-and-push:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write # Required to push to GHCR
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+            - name: Log in to the Container registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Extract metadata (tags, labels)
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  # This automatically creates:
+                  #   ghcr.io/OWNER/REPO:1.2.3
+                  #   ghcr.io/OWNER/REPO:latest   (when you push a tag)
+                  tags: |
+                      type=semver,pattern={{version}}
+                      type=raw,value=latest,enable={{is_default_branch}}
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  file: ./Dockerfile # Change if your Dockerfile is elsewhere
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  # Optional: enable Buildx cache for faster subsequent builds
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
