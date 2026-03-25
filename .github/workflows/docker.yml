@@ -1,9 +1,11 @@
-name: Release
+name: Docker
 
 on:
     push:
         tags:
             - "v*"
+        branches:
+            - main
 
 env:
     CARGO_TERM_COLOR: always
@@ -54,4 +56,4 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
                   # Optional: enable Buildx cache for faster subsequent builds
                   cache-from: type=gha
-                  cache-to: type=gha,mode=max
+                  cache-to: type=gha
