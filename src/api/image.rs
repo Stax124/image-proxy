@@ -3,12 +3,11 @@ use std::sync::Arc;
 
 use crate::{
     config::EncodingConfig,
-    utils::{
-        convert_bytes_to_readable_size, load_bytes_from_disk, load_image_from_path,
-        mime_type_for_format,
-    },
+    utils::{convert_bytes_to_readable_size, load_bytes_from_disk, mime_type_for_format},
 };
 use actix_web::{HttpResponse, web};
+
+const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
 
 #[actix_web::get("/{filename:.*}")]
 #[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
@@ -35,6 +34,18 @@ pub async fn process_image_request(
             acc.join(comp.as_os_str())
         });
 
+    // Check if the extension is valid and supported
+    let file_ext = sanitized_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase());
+    if let Some(ext) = &file_ext {
+        if !SUPPORTED_FORMATS.contains(&ext.as_str()) {
+            return Ok(HttpResponse::UnsupportedMediaType()
+                .body(format!("Unsupported file format: {}", ext)));
+        }
+    }
+
     tracing::debug!(
         query_params = ?query_params,
         strip_path = ?config.strip_path,
@@ -42,10 +53,6 @@ pub async fn process_image_request(
         sanitized_path = ?sanitized_path,
         filename = ?filename,
     );
-
-    if !sanitized_path.exists() {
-        return Ok(HttpResponse::NotFound().body("File not found"));
-    }
 
     let file_ext = sanitized_path
         .extension()
@@ -58,20 +65,37 @@ pub async fn process_image_request(
         .and_then(|s| s.parse::<u32>().ok())
         .filter(|&s| s > 0);
 
-    // If no transformation requested, serve the original file bytes directly
-    if format_param.is_none() && size_param.is_none() {
+    let image_bytes: Vec<u8>;
+    if !sanitized_path.exists() {
+        if config.fallback_image_url.is_some() {
+            image_bytes = crate::utils::load_fallback_image_from_url(&filename, &config)
+                .await
+                .map_err(|t| {
+                    actix_web::error::ErrorInternalServerError(format!(
+                        "Failed to load fallback image: {}",
+                        t
+                    ))
+                })?;
+        } else {
+            return Ok(HttpResponse::NotFound().body("File not found"));
+        }
+    } else {
         let path = sanitized_path.clone();
-        let bytes = web::block(move || load_bytes_from_disk(&path))
+        image_bytes = web::block(move || load_bytes_from_disk(&path))
             .await
             .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
             .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?;
+    }
+
+    // If no transformation requested, serve the original file bytes directly
+    if format_param.is_none() && size_param.is_none() {
         let content_type = mime_type_for_format(file_ext.as_deref());
-        let size_str = convert_bytes_to_readable_size(bytes.len() as u64);
+        let size_str = convert_bytes_to_readable_size(image_bytes.len() as u64);
         return Ok(HttpResponse::Ok()
             .content_type(content_type)
             .insert_header(("X-Original-Size", size_str.clone()))
             .insert_header(("X-Final-Size", size_str))
-            .body(bytes));
+            .body(image_bytes));
     }
 
     // Use the explicitly requested format, or fall back to the original file's format
@@ -80,8 +104,8 @@ pub async fn process_image_request(
 
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
     let config = config.get_ref().clone();
-    let image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
-        let image = load_image_from_path(&sanitized_path)?;
+    let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
+        let image = image::load_from_memory(&image_bytes)?;
         let bytes = crate::operations::pipeline::image_pipeline(
             image,
             size_param,
@@ -98,5 +122,5 @@ pub async fn process_image_request(
 
     Ok(HttpResponse::Ok()
         .content_type(content_type)
-        .body(image_bytes))
+        .body(result_image_bytes))
 }

@@ -8,6 +8,7 @@ pub struct EncodingConfig {
     pub use_faster_resize: bool,
     pub root_path: String,
     pub strip_path: Option<String>,
+    pub fallback_image_url: Option<String>,
 }
 
 impl EncodingConfig {
@@ -40,6 +41,7 @@ impl EncodingConfig {
             root_path: std::env::var("IMAGE_PROXY_ROOT_PATH")
                 .unwrap_or_else(|_| "/app/data".to_string()),
             strip_path: std::env::var("IMAGE_PROXY_STRIP_PATH").ok(),
+            fallback_image_url: std::env::var("IMAGE_PROXY_FALLBACK_IMAGE_URL").ok(),
         }
     }
 }
