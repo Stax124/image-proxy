@@ -67,7 +67,23 @@ pub async fn process_image_request(
 
     let image_bytes: Vec<u8>;
     if !sanitized_path.exists() {
+        // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some() {
+            if query_params.is_empty() {
+                // Just redirect to the fallback image if no transformations are requested
+                return Ok(HttpResponse::Found()
+                    .insert_header((
+                        "Location",
+                        format!(
+                            "{}{}",
+                            config.fallback_image_url.as_ref().unwrap(),
+                            sanitized_path.to_str().unwrap_or_default()
+                        ),
+                    ))
+                    .finish());
+            }
+
+            // Otherwise, attempt to load the fallback image and apply transformations to it
             image_bytes = crate::utils::load_fallback_image_from_url(&filename, &config)
                 .await
                 .map_err(|t| {
@@ -80,6 +96,7 @@ pub async fn process_image_request(
             return Ok(HttpResponse::NotFound().body("File not found"));
         }
     } else {
+        // Load the original file bytes from disk in a blocking thread to avoid blocking the async runtime
         let path = sanitized_path.clone();
         image_bytes = web::block(move || load_bytes_from_disk(&path))
             .await
@@ -88,7 +105,7 @@ pub async fn process_image_request(
     }
 
     // If no transformation requested, serve the original file bytes directly
-    if format_param.is_none() && size_param.is_none() {
+    if query_params.is_empty() {
         let content_type = mime_type_for_format(file_ext.as_deref());
         let size_str = convert_bytes_to_readable_size(image_bytes.len() as u64);
         return Ok(HttpResponse::Ok()
