@@ -38,7 +38,7 @@ impl EncodingConfig {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(true),
             root_path: std::env::var("IMAGE_PROXY_ROOT_PATH")
-                .unwrap_or_else(|_| "/data".to_string()),
+                .unwrap_or_else(|_| "/app/data".to_string()),
             strip_path: std::env::var("IMAGE_PROXY_STRIP_PATH").ok(),
         }
     }

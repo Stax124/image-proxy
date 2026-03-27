@@ -40,7 +40,7 @@ All settings are provided via environment variables.
 | Variable                            | Default        | Description                                                                                                                                              |
 | ----------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `IMAGE_PROXY_BIND_ADDRESS`          | `0.0.0.0:8000` | TCP address and port to listen on                                                                                                                        |
-| `IMAGE_PROXY_ROOT_PATH`             | `/data`        | Root directory for image files                                                                                                                           |
+| `IMAGE_PROXY_ROOT_PATH`             | `/app/data`    | Root directory for image files                                                                                                                           |
 | `IMAGE_PROXY_STRIP_PATH`            | *(unset)*      | Path prefix to strip from incoming requests (e.g. `static/image` when behind a reverse proxy like Traefik that routes `/static/image/…` to this service) |
 | `IMAGE_PROXY_AVIF_SPEED`            | `7`            | AVIF encoder speed (1–10, higher = faster/lower quality)                                                                                                 |
 | `IMAGE_PROXY_AVIF_QUALITY`          | `75`           | AVIF quality (0–100)                                                                                                                                     |
