@@ -37,18 +37,18 @@ GET /photos/sample.jpg?size=400&format=webp  # resize + convert to WebP
 
 All settings are provided via environment variables.
 
-| Variable                            | Default        | Description                                                                                                                                              |
-| ----------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IMAGE_PROXY_BIND_ADDRESS`          | `0.0.0.0:8000` | TCP address and port to listen on                                                                                                                        |
-| `IMAGE_PROXY_ROOT_PATH`             | `/app/data`    | Root directory for image files                                                                                                                           |
-| `IMAGE_PROXY_STRIP_PATH`            | *(unset)*      | Path prefix to strip from incoming requests (e.g. `static/image` when behind a reverse proxy like Traefik that routes `/static/image/…` to this service) |
-| `IMAGE_PROXY_AVIF_SPEED`            | `7`            | AVIF encoder speed (1–10, higher = faster/lower quality)                                                                                                 |
-| `IMAGE_PROXY_AVIF_QUALITY`          | `75`           | AVIF quality (0–100)                                                                                                                                     |
-| `IMAGE_PROXY_JPEG_QUALITY`          | `75`           | JPEG quality (0–100)                                                                                                                                     |
-| `IMAGE_PROXY_WEBP_QUALITY`          | `75.0`         | WebP quality (0.0–100.0)                                                                                                                                 |
-| `IMAGE_PROXY_PNG_COMPRESSION_LEVEL` | `6`            | PNG compression level (0–9, higher = smaller file/slower encoding)                                                                                       |
-| `IMAGE_PROXY_USE_FASTER_RESIZE`     | `true`         | Use faster scaling algorithm instead of Lanczos3, but may introduce aliasing-like artifacts                                                              |
-| `RUST_LOG`                          | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                                    |
+| Variable                            | Default        | Description                                                                                                                                               |
+| ----------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMAGE_PROXY_BIND_ADDRESS`          | `0.0.0.0:8000` | TCP address and port to listen on                                                                                                                         |
+| `IMAGE_PROXY_ROOT_PATH`             | `/app/data`    | Root directory for image files                                                                                                                            |
+| `IMAGE_PROXY_STRIP_PATH`            | *(unset)*      | Path prefix to strip from incoming requests (e.g. `static/image/` when behind a reverse proxy like Traefik that routes `/static/image/…` to this service) |
+| `IMAGE_PROXY_AVIF_SPEED`            | `7`            | AVIF encoder speed (1–10, higher = faster/lower quality)                                                                                                  |
+| `IMAGE_PROXY_AVIF_QUALITY`          | `75`           | AVIF quality (0–100)                                                                                                                                      |
+| `IMAGE_PROXY_JPEG_QUALITY`          | `75`           | JPEG quality (0–100)                                                                                                                                      |
+| `IMAGE_PROXY_WEBP_QUALITY`          | `75.0`         | WebP quality (0.0–100.0)                                                                                                                                  |
+| `IMAGE_PROXY_PNG_COMPRESSION_LEVEL` | `6`            | PNG compression level (0–9, higher = smaller file/slower encoding)                                                                                        |
+| `IMAGE_PROXY_USE_FASTER_RESIZE`     | `true`         | Use faster scaling algorithm instead of Lanczos3, but may introduce aliasing-like artifacts                                                               |
+| `RUST_LOG`                          | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                                     |
 
 ## Running
 
