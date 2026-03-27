@@ -22,7 +22,13 @@ pub fn convert_bytes_to_readable_size(bytes: u64) -> String {
     format!("{:.2} {}", size, units[unit_index])
 }
 
+#[tracing::instrument(level = "debug")]
 pub fn load_image_from_path(path: &Path) -> anyhow::Result<image::DynamicImage> {
     let image = image::open(path)?;
     Ok(image)
+}
+
+#[tracing::instrument(level = "debug")]
+pub fn load_bytes_from_disk(path: &Path) -> std::io::Result<Vec<u8>> {
+    std::fs::read(path)
 }

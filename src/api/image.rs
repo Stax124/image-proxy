@@ -3,23 +3,45 @@ use std::sync::Arc;
 
 use crate::{
     config::EncodingConfig,
-    utils::{convert_bytes_to_readable_size, load_image_from_path, mime_type_for_format},
+    utils::{
+        convert_bytes_to_readable_size, load_bytes_from_disk, load_image_from_path,
+        mime_type_for_format,
+    },
 };
 use actix_web::{HttpResponse, web};
 
 #[actix_web::get("/{filename:.*}")]
+#[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
 pub async fn process_image_request(
     filename: web::Path<String>,
     query_params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<Arc<EncodingConfig>>,
 ) -> actix_web::Result<HttpResponse> {
+    // Strip the specified path from the filename if configured
+    let filename = if let Some(strip_path) = &config.strip_path {
+        filename
+            .strip_prefix(strip_path)
+            .unwrap_or(&filename)
+            .to_string()
+    } else {
+        filename.to_string()
+    };
+
     // Sanitize the path to prevent directory traversal
-    let sanitized_path = Path::new(&filename.to_string())
+    let sanitized_path = Path::new(&filename)
         .components()
         .filter(|comp| matches!(comp, std::path::Component::Normal(_)))
         .fold(Path::new(&config.root_path).to_path_buf(), |acc, comp| {
             acc.join(comp.as_os_str())
         });
+
+    tracing::debug!(
+        query_params = ?query_params,
+        strip_path = ?config.strip_path,
+        root_path = ?config.root_path,
+        sanitized_path = ?sanitized_path,
+        filename = ?filename,
+    );
 
     if !sanitized_path.exists() {
         return Ok(HttpResponse::NotFound().body("File not found"));
@@ -39,7 +61,7 @@ pub async fn process_image_request(
     // If no transformation requested, serve the original file bytes directly
     if format_param.is_none() && size_param.is_none() {
         let path = sanitized_path.clone();
-        let bytes = web::block(move || std::fs::read(path))
+        let bytes = web::block(move || load_bytes_from_disk(&path))
             .await
             .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
             .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?;

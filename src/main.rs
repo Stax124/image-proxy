@@ -2,7 +2,12 @@ use std::sync::Arc;
 
 use actix_web::{App, HttpServer, middleware, web};
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter,
+    fmt::{self, format::FmtSpan},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 use crate::{api::image::process_image_request, config::EncodingConfig};
 
@@ -14,7 +19,7 @@ mod utils;
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
-        .with(fmt::layer())
+        .with(fmt::layer().with_span_events(FmtSpan::CLOSE))
         .with(
             EnvFilter::builder()
                 .with_default_directive(LevelFilter::INFO.into())

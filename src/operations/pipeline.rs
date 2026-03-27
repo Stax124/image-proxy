@@ -5,6 +5,7 @@ use crate::{
     operations::{format::convert_image_format, resize::resize_image},
 };
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub fn image_pipeline(
     image: DynamicImage,
     size: Option<u32>,

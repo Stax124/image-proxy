@@ -1,7 +1,8 @@
-use image::{DynamicImage, ImageEncoder};
+use image::{DynamicImage, ImageEncoder, codecs::png::CompressionType};
 
 use crate::config::EncodingConfig;
 
+#[tracing::instrument(level = "debug", skip_all, fields(format = ?format))]
 pub fn convert_image_format(
     image: DynamicImage,
     format: Option<&str>,
@@ -36,7 +37,11 @@ pub fn convert_image_format(
             )?
         }
         Some("png") => {
-            let encoder = image::codecs::png::PngEncoder::new(&mut buffer);
+            let encoder = image::codecs::png::PngEncoder::new_with_quality(
+                &mut buffer,
+                CompressionType::Level(config.png_compression_level),
+                image::codecs::png::FilterType::Adaptive,
+            );
             encoder.write_image(
                 image.as_bytes(),
                 image.width(),

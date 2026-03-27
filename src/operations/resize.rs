@@ -1,6 +1,6 @@
 use image::DynamicImage;
 
-/// Resize the image in a way that preserves the aspect ratio and fits within a square of the given size.
+#[tracing::instrument(level = "debug", skip_all, fields(size = ?size, use_faster_resize))]
 pub fn resize_image(
     image: DynamicImage,
     size: Option<u32>,
@@ -12,6 +12,8 @@ pub fn resize_image(
     }
 
     if use_faster_resize {
+        image.thumbnail(size, size)
+    } else {
         let aspect_ratio = image.width() as f64 / image.height() as f64;
         let (new_width, new_height) = if aspect_ratio > 1.0 {
             // Landscape orientation
@@ -22,7 +24,5 @@ pub fn resize_image(
         };
 
         image.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3)
-    } else {
-        image.thumbnail(size, size)
     }
 }
