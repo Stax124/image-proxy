@@ -55,6 +55,8 @@ All settings are provided via environment variables.
 
 ### Docker Compose (recommended)
 
+Create a `.env` file from the provided `.env.template` and adjust settings as needed, then run:
+
 ```sh
 docker compose up --build
 ```

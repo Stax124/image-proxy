@@ -30,12 +30,22 @@ pub async fn process_image_request(
     let sanitized_path = Path::new(&filename)
         .components()
         .filter(|comp| matches!(comp, std::path::Component::Normal(_)))
-        .fold(Path::new(&config.root_path).to_path_buf(), |acc, comp| {
+        .fold(Path::new("").to_path_buf(), |acc, comp| {
             acc.join(comp.as_os_str())
         });
 
+    // Join the sanitized path with the root path to get the final file path
+    let sanitized_disk_path = Path::new(&config.root_path).join(&sanitized_path);
+
+    // Prepare the fallback image URL with the sanitized path for potential use later
+    let remote_url_sanitized_path = format!(
+        "{}{}",
+        config.fallback_image_url.as_ref().unwrap(),
+        sanitized_path.to_str().unwrap_or_default()
+    );
+
     // Check if the extension is valid and supported
-    let file_ext = sanitized_path
+    let file_ext = sanitized_disk_path
         .extension()
         .and_then(|e| e.to_str())
         .map(|s| s.to_lowercase());
@@ -51,13 +61,10 @@ pub async fn process_image_request(
         strip_path = ?config.strip_path,
         root_path = ?config.root_path,
         sanitized_path = ?sanitized_path,
+        sanitized_disk_path = ?sanitized_disk_path,
+        remote_url_sanitized_path = ?remote_url_sanitized_path,
         filename = ?filename,
     );
-
-    let file_ext = sanitized_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.to_lowercase());
 
     let format_param = query_params.get("format").map(|s| s.to_lowercase());
     let size_param = query_params
@@ -66,20 +73,13 @@ pub async fn process_image_request(
         .filter(|&s| s > 0);
 
     let image_bytes: Vec<u8>;
-    if !sanitized_path.exists() {
+    if !sanitized_disk_path.exists() {
         // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some() {
             if query_params.is_empty() {
                 // Just redirect to the fallback image if no transformations are requested
                 return Ok(HttpResponse::Found()
-                    .insert_header((
-                        "Location",
-                        format!(
-                            "{}{}",
-                            config.fallback_image_url.as_ref().unwrap(),
-                            sanitized_path.to_str().unwrap_or_default()
-                        ),
-                    ))
+                    .insert_header(("Location", remote_url_sanitized_path.clone()))
                     .finish());
             }
 
@@ -97,7 +97,7 @@ pub async fn process_image_request(
         }
     } else {
         // Load the original file bytes from disk in a blocking thread to avoid blocking the async runtime
-        let path = sanitized_path.clone();
+        let path = sanitized_disk_path.clone();
         image_bytes = web::block(move || load_bytes_from_disk(&path))
             .await
             .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?

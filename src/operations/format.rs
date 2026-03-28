@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageEncoder, codecs::png::CompressionType};
+use image::{DynamicImage, EncodableLayout, ImageEncoder, codecs::png::CompressionType};
 
 use crate::config::EncodingConfig;
 
@@ -29,11 +29,14 @@ pub fn convert_image_format(
                 &mut buffer,
                 config.jpeg_quality,
             );
+
+            let converted_to_rgb = image.into_rgb8();
+
             encoder.write_image(
-                image.as_bytes(),
-                image.width(),
-                image.height(),
-                image.color().into(),
+                converted_to_rgb.as_bytes(),
+                converted_to_rgb.width(),
+                converted_to_rgb.height(),
+                image::ExtendedColorType::Rgb8,
             )?
         }
         Some("png") => {
