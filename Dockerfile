@@ -57,9 +57,6 @@ WORKDIR /app
 # Copy only the compiled binary from the build stage.
 COPY --from=build /bin/image-proxy /bin/image-proxy
 
-# Rocket: listen on all interfaces inside the container.
-ENV ROCKET_ADDRESS=0.0.0.0
-
 # Document the port your app listens on.
 EXPOSE 8000
 

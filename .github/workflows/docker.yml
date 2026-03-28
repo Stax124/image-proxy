@@ -24,6 +24,8 @@ jobs:
               uses: spice-labs-inc/action-check-version@main
     build-and-push:
         runs-on: ubuntu-latest
+        needs: check-version
+        if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
         permissions:
             contents: read
             packages: write # Required to push to GHCR
