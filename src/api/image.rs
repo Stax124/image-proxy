@@ -87,10 +87,8 @@ pub async fn process_image_request(
             image_bytes = crate::utils::load_fallback_image_from_url(&filename, &config)
                 .await
                 .map_err(|t| {
-                    actix_web::error::ErrorInternalServerError(format!(
-                        "Failed to load fallback image: {}",
-                        t
-                    ))
+                    tracing::error!("Failed to load fallback image: {}", t);
+                    actix_web::error::ErrorInternalServerError("Failed to load fallback image")
                 })?;
         } else {
             return Ok(HttpResponse::NotFound().body("File not found"));
@@ -98,9 +96,8 @@ pub async fn process_image_request(
     } else {
         // Load the original file bytes from disk in a blocking thread to avoid blocking the async runtime
         let path = sanitized_disk_path.clone();
-        image_bytes = web::block(move || load_bytes_from_disk(&path))
+        image_bytes = load_bytes_from_disk(&path)
             .await
-            .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
             .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?;
     }
 

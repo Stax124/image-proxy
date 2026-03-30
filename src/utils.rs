@@ -25,8 +25,8 @@ pub fn convert_bytes_to_readable_size(bytes: u64) -> String {
 }
 
 #[tracing::instrument(level = "debug")]
-pub fn load_bytes_from_disk(path: &Path) -> std::io::Result<Vec<u8>> {
-    std::fs::read(path)
+pub async fn load_bytes_from_disk(path: &Path) -> std::io::Result<Vec<u8>> {
+    tokio::fs::read(path).await
 }
 
 // TODO: rework into tagged enum to return HTTP response from actix-web or the data as bytes
