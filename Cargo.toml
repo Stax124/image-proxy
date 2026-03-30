@@ -4,7 +4,6 @@ version = "0.5.0"
 edition = "2024"
 
 [dependencies]
-actix-files = { version = "0.6.10", features = ["experimental-io-uring"] }
 actix-web = "4.13.0"
 anyhow = "1.0.102"
 image = { version = "0.25.10", features = ["nasm", "avif-native"] }
