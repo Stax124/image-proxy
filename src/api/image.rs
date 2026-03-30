@@ -37,13 +37,6 @@ pub async fn process_image_request(
     // Join the sanitized path with the root path to get the final file path
     let sanitized_disk_path = Path::new(&config.root_path).join(&sanitized_path);
 
-    // Prepare the fallback image URL with the sanitized path for potential use later
-    let remote_url_sanitized_path = format!(
-        "{}{}",
-        config.fallback_image_url.as_ref().unwrap(),
-        sanitized_path.to_str().unwrap_or_default()
-    );
-
     // Check if the extension is valid and supported
     let file_ext = sanitized_disk_path
         .extension()
@@ -62,7 +55,6 @@ pub async fn process_image_request(
         root_path = ?config.root_path,
         sanitized_path = ?sanitized_path,
         sanitized_disk_path = ?sanitized_disk_path,
-        remote_url_sanitized_path = ?remote_url_sanitized_path,
         filename = ?filename,
     );
 
@@ -77,6 +69,16 @@ pub async fn process_image_request(
         // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some() {
             if query_params.is_empty() {
+                // Prepare the fallback image URL with the sanitized path for potential use later
+                let remote_url_sanitized_path = format!(
+                    "{}{}",
+                    config
+                        .fallback_image_url
+                        .as_ref()
+                        .unwrap_or(&"".to_string()),
+                    sanitized_path.to_str().unwrap_or_default()
+                );
+
                 // Just redirect to the fallback image if no transformations are requested
                 return Ok(HttpResponse::Found()
                     .insert_header(("Location", remote_url_sanitized_path.clone()))
