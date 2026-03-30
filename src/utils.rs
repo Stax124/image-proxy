@@ -11,18 +11,6 @@ pub fn mime_type_for_format(format: Option<&str>) -> &'static str {
         _ => "application/octet-stream",
     }
 }
-pub fn convert_bytes_to_readable_size(bytes: u64) -> String {
-    let units = ["B", "KiB", "MiB", "GiB"];
-    let mut size = bytes as f64;
-    let mut unit_index = 0;
-
-    while size >= 1024.0 && unit_index < units.len() - 1 {
-        size /= 1024.0;
-        unit_index += 1;
-    }
-
-    format!("{:.2} {}", size, units[unit_index])
-}
 
 #[tracing::instrument(level = "debug")]
 pub async fn load_bytes_from_disk(path: &Path) -> std::io::Result<Vec<u8>> {
