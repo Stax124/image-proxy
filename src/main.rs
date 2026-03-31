@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use actix_web::{App, HttpServer, middleware, web};
 use tracing::level_filters::LevelFilter;
@@ -30,7 +30,12 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(EncodingConfig::from_env());
 
     HttpServer::new(move || {
+        let http_client = awc::ClientBuilder::new()
+            .timeout(Duration::from_secs(5))
+            .finish();
+
         App::new()
+            .app_data(web::Data::new(http_client))
             .app_data(web::Data::new(config.clone()))
             .wrap(middleware::Logger::new("%a %r %s %b %D"))
             .service(process_image_request)

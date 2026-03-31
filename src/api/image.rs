@@ -5,7 +5,7 @@ use crate::{
     config::EncodingConfig,
     utils::{load_bytes_from_disk, mime_type_for_format},
 };
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpMessage, HttpResponse, web};
 use futures_util::TryStreamExt;
 use tokio_util::io::ReaderStream;
 
@@ -17,6 +17,7 @@ pub async fn process_image_request(
     filename: web::Path<String>,
     query_params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<Arc<EncodingConfig>>,
+    http_client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse> {
     // Strip the specified path from the filename if configured
     let filename = if let Some(strip_path) = &config.strip_path {
@@ -72,14 +73,18 @@ pub async fn process_image_request(
 
         let metadata = tokio::fs::metadata(&sanitized_disk_path)
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                tracing::error!("Failed to read file metadata: {}", e);
                 actix_web::error::ErrorInternalServerError("Failed to read file metadata")
             })?;
         let size = metadata.len();
 
         let file = tokio::fs::File::open(&sanitized_disk_path)
             .await
-            .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to open file"))?;
+            .map_err(|e| {
+                tracing::error!("Failed to open file: {}", e);
+                actix_web::error::ErrorInternalServerError("Failed to open file")
+            })?;
         let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
 
         return Ok(HttpResponse::Ok()
@@ -91,31 +96,39 @@ pub async fn process_image_request(
     let image_bytes: Vec<u8>;
     if !sanitized_disk_path.exists() {
         // If the file doesn't exist, check if a fallback image URL is configured
-        if config.fallback_image_url.is_some() {
-            if query_params.is_empty() {
-                // Prepare the fallback image URL with the sanitized path for potential use later
-                let remote_url_sanitized_path = format!(
-                    "{}{}",
-                    config
-                        .fallback_image_url
-                        .as_ref()
-                        .unwrap_or(&"".to_string()),
-                    sanitized_path.to_str().unwrap_or_default()
-                );
+        if config.fallback_image_url.is_some()
+            && !config.fallback_image_url.as_ref().unwrap().is_empty()
+        {
+            let url = match &config.fallback_image_url {
+                Some(base_url) => format!("{}{}", base_url, filename),
+                None => filename.to_string(),
+            };
 
-                // Just redirect to the fallback image if no transformations are requested
-                return Ok(HttpResponse::Found()
-                    .insert_header(("Location", remote_url_sanitized_path.clone()))
-                    .finish());
+            let mut upstream_response = http_client.get(&url).send().await.map_err(|e| {
+                tracing::error!("Failed to fetch fallback image: {}", e);
+                actix_web::error::ErrorInternalServerError("Failed to fetch fallback image")
+            })?;
+
+            if !upstream_response.status().is_success() {
+                tracing::error!(
+                    "Failed to fetch fallback image, status: {}",
+                    upstream_response.status()
+                );
+                return Ok(
+                    HttpResponse::InternalServerError().body("Failed to fetch fallback image")
+                );
+            }
+
+            if query_params.is_empty() {
+                // Return a streaming response for the fallback image if no transformations are requested
+                return Ok(HttpResponse::Ok()
+                    .content_type(upstream_response.content_type())
+                    .streaming(upstream_response));
             }
 
             // Otherwise, attempt to load the fallback image and apply transformations to it
-            image_bytes = crate::utils::load_fallback_image_from_url(&filename, &config)
-                .await
-                .map_err(|t| {
-                    tracing::error!("Failed to load fallback image: {}", t);
-                    actix_web::error::ErrorInternalServerError("Failed to load fallback image")
-                })?;
+            let fallback_image_body = upstream_response.body().await?;
+            image_bytes = fallback_image_body.to_vec();
         } else {
             return Ok(HttpResponse::NotFound().body("File not found"));
         }

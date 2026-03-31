@@ -1,21 +1,22 @@
 [package]
 name = "image-proxy"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 
 [dependencies]
 actix-web = "4.13.0"
 anyhow = "1.0.102"
+awc = { version = "3.8.2", features = ["rustls"] }
 futures-util = "0.3.31"
 image = { version = "0.25.10", features = ["nasm", "avif-native"] }
-reqwest = { version = "0.13.2", features = ["http2"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = "0.7.16"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 webp = "0.3.1"
 
-[profile.release]
+[profile.release-optimized]
+inherits = "release"
 opt-level = 3
 lto = true
 codegen-units = 1

@@ -24,8 +24,8 @@ RUN --mount=type=bind,source=src,target=src \
     --mount=type=cache,target=/app/target/ \
     --mount=type=cache,target=/usr/local/cargo/git/db \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --locked --release && \
-    cp ./target/release/image-proxy /bin/image-proxy
+    cargo build --locked --profile release-optimized && \
+    cp ./target/release-optimized/image-proxy /bin/image-proxy
 
 ################################################################################
 # Runtime stage (DOI Alpine image)
