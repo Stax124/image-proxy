@@ -19,6 +19,7 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 # Build the application 
 RUN --mount=type=bind,source=src,target=src \
+    --mount=type=bind,source=image,target=image \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
     --mount=type=cache,target=/app/target/ \
