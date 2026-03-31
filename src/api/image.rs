@@ -105,18 +105,21 @@ pub async fn process_image_request(
             };
 
             let mut upstream_response = http_client.get(&url).send().await.map_err(|e| {
-                tracing::error!("Failed to fetch fallback image: {}", e);
-                actix_web::error::ErrorInternalServerError("Failed to fetch fallback image")
+                tracing::debug!("Failed to fetch fallback image: {}", e);
+                // Reflect upstream fetch errors
+                actix_web::error::ErrorBadGateway("Failed to fetch fallback image")
             })?;
 
             if !upstream_response.status().is_success() {
-                tracing::error!(
+                tracing::debug!(
                     "Failed to fetch fallback image, status: {}",
                     upstream_response.status()
                 );
-                return Ok(
-                    HttpResponse::InternalServerError().body("Failed to fetch fallback image")
-                );
+                return Err(actix_web::error::InternalError::new(
+                    "Failed to fetch fallback image",
+                    upstream_response.status(),
+                )
+                .into());
             }
 
             if query_params.is_empty() {
