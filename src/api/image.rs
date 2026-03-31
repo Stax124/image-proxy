@@ -45,11 +45,12 @@ pub async fn process_image_request(
         .extension()
         .and_then(|e| e.to_str())
         .map(|s| s.to_lowercase());
-    if let Some(ext) = &file_ext {
-        if !SUPPORTED_FORMATS.contains(&ext.as_str()) {
-            return Ok(HttpResponse::UnsupportedMediaType()
-                .body(format!("Unsupported file format: {}", ext)));
-        }
+    if let Some(ext) = &file_ext
+        && !SUPPORTED_FORMATS.contains(&ext.as_str())
+    {
+        return Ok(
+            HttpResponse::UnsupportedMediaType().body(format!("Unsupported file format: {}", ext))
+        );
     }
 
     tracing::debug!(

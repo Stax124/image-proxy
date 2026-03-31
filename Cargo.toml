@@ -8,7 +8,7 @@ actix-web = "4.13.0"
 anyhow = "1.0.102"
 awc = { version = "3.8.2", features = ["rustls"] }
 futures-util = "0.3.31"
-image = { version = "0.25.10", features = ["nasm", "avif-native"] }
+image = { version = "*", features = ["nasm", "avif-native"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = "0.7.16"
 tracing = "0.1.44"
@@ -20,3 +20,6 @@ inherits = "release"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[patch.crates-io]
+image = { path = "./image" }

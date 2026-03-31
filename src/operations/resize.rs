@@ -2,7 +2,7 @@ use image::DynamicImage;
 
 #[tracing::instrument(level = "debug", skip_all, fields(size = ?size, use_faster_resize))]
 pub fn resize_image(
-    image: DynamicImage,
+    mut image: DynamicImage,
     size: Option<u32>,
     use_faster_resize: bool,
 ) -> DynamicImage {
@@ -30,6 +30,7 @@ pub fn resize_image(
             ((size as f64 * aspect_ratio).round() as u32, size)
         };
 
-        image.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3)
+        image.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3);
+        image
     }
 }
