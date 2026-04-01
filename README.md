@@ -48,7 +48,7 @@ All settings are provided via environment variables.
 | `IMAGE_PROXY_JPEG_QUALITY`          | `75`           | JPEG quality (0–100)                                                                                                                                      |
 | `IMAGE_PROXY_WEBP_QUALITY`          | `75.0`         | WebP quality (0.0–100.0)                                                                                                                                  |
 | `IMAGE_PROXY_PNG_COMPRESSION_LEVEL` | `6`            | PNG compression level (0–9, higher = smaller file/slower encoding)                                                                                        |
-| `IMAGE_PROXY_USE_FASTER_RESIZE`     | `true`         | Use faster scaling algorithm instead of Lanczos3, but may introduce aliasing-like artifacts                                                               |
+| `IMAGE_PROXY_RESIZE_ALGORITHM`      | `auto`         | Resize algorithm to use: `lanczos3`, `thumbnail`, or `auto` (can be overridden by per-request query parameter)                                            |
 | `RUST_LOG`                          | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                                     |
 
 ## Running

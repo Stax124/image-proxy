@@ -1,3 +1,5 @@
+use crate::operations::resize::ResizeAlgorithm;
+
 #[derive(Clone)]
 pub struct EncodingConfig {
     pub avif_speed: u8,
@@ -5,7 +7,7 @@ pub struct EncodingConfig {
     pub jpeg_quality: u8,
     pub webp_quality: f32,
     pub png_compression_level: u8,
-    pub use_faster_resize: bool,
+    pub resize_algorithm: ResizeAlgorithm,
     pub root_path: String,
     pub strip_path: Option<String>,
     pub fallback_image_url: Option<String>,
@@ -34,10 +36,10 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(6),
-            use_faster_resize: std::env::var("IMAGE_PROXY_USE_FASTER_RESIZE")
+            resize_algorithm: std::env::var("IMAGE_PROXY_RESIZE_ALGORITHM")
                 .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(true),
+                .and_then(|s| ResizeAlgorithm::from_str(&s))
+                .unwrap_or(ResizeAlgorithm::Auto),
             root_path: std::env::var("IMAGE_PROXY_ROOT_PATH")
                 .unwrap_or_else(|_| "/app/data".to_string()),
             strip_path: std::env::var("IMAGE_PROXY_STRIP_PATH").ok(),

@@ -16,14 +16,6 @@ pub fn image_pipeline(
     config: &EncodingConfig,
     resize_algorithm: Option<ResizeAlgorithm>,
 ) -> anyhow::Result<Vec<u8>> {
-    // Fall back to the global config default when no per-request algorithm is given.
-    let algorithm = resize_algorithm.unwrap_or_else(|| {
-        if config.use_faster_resize {
-            ResizeAlgorithm::Thumbnail
-        } else {
-            ResizeAlgorithm::Lanczos3
-        }
-    });
-    let image = resize_image(image, size, algorithm);
+    let image = resize_image(image, size, resize_algorithm, config);
     convert_image_format(image, Some(format), config)
 }

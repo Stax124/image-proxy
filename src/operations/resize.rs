@@ -27,13 +27,17 @@ impl ResizeAlgorithm {
 pub fn resize_image(
     mut image: DynamicImage,
     size: Option<u32>,
-    algorithm: ResizeAlgorithm,
+    algorithm: Option<ResizeAlgorithm>,
+    config: &crate::config::EncodingConfig,
 ) -> DynamicImage {
     // If size is not specified or zero, return the original image
     let size = size.unwrap_or(0);
     if size == 0 {
         return image;
     }
+
+    // Use the specified algorithm or fall back to the default from the config
+    let algorithm = algorithm.unwrap_or(config.resize_algorithm);
 
     // Do not go larger than the original image size
     let max_height = image.height().min(size);
@@ -52,6 +56,12 @@ pub fn resize_image(
     } else {
         algorithm
     };
+
+    tracing::debug!(
+        "Resizing image to size {} using algorithm {:?}",
+        size,
+        algorithm
+    );
 
     // Resize the image while maintaining aspect ratio
     match algorithm {
