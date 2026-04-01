@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     config::EncodingConfig,
+    operations::resize::ResizeAlgorithm,
     utils::{load_bytes_from_disk, mime_type_for_format},
 };
 use actix_web::{HttpMessage, HttpResponse, web};
@@ -67,6 +68,35 @@ pub async fn process_image_request(
         .get("size")
         .and_then(|s| s.parse::<u32>().ok())
         .filter(|&s| s > 0);
+    let resize_algorithm_param = query_params
+        .get("resize_algorithm")
+        .and_then(|s| ResizeAlgorithm::from_str(s));
+
+    // Stream local files directly when no transformation is requested.
+    if query_params.is_empty() && sanitized_disk_path.exists() {
+        let content_type = mime_type_for_format(file_ext.as_deref());
+
+        let metadata = tokio::fs::metadata(&sanitized_disk_path)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to read file metadata: {}", e);
+                actix_web::error::ErrorInternalServerError("Failed to read file metadata")
+            })?;
+        let size = metadata.len();
+
+        let file = tokio::fs::File::open(&sanitized_disk_path)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to open file: {}", e);
+                actix_web::error::ErrorInternalServerError("Failed to open file")
+            })?;
+        let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
+
+        return Ok(HttpResponse::Ok()
+            .content_type(content_type)
+            .insert_header(("Content-Length", size.to_string()))
+            .streaming(stream));
+    }
 
     // Stream local files directly when no transformation is requested.
     if query_params.is_empty() && sanitized_disk_path.exists() {
@@ -157,6 +187,7 @@ pub async fn process_image_request(
             size_param,
             &effective_format,
             &config,
+            resize_algorithm_param,
         )?;
         Ok(bytes)
     })
