@@ -2,14 +2,30 @@ use crate::operations::resize::ResizeAlgorithm;
 
 #[derive(Clone)]
 pub struct EncodingConfig {
-    pub avif_speed: u8,
-    pub avif_quality: u8,
+    // JPEG encoding parameters
     pub jpeg_quality: u8,
-    pub webp_quality: f32,
+
+    // PNG encoding parameters
     pub png_compression_level: u8,
+
+    // AVIF encoding parameters
+    pub avif_quality: u8,
+    /// AVIF encoding speed (0-10); higher is faster but worse compression
+    pub avif_speed: u8,
+
+    // WebP encoding parameters
+    pub webp_quality: u8,
+    /// WebP effort level (0-6); higher is slower but better compression
+    pub webp_effort: u8,
+
+    // Resizing parameters
     pub resize_algorithm: ResizeAlgorithm,
+
+    // Path configuration
     pub root_path: String,
     pub strip_path: Option<String>,
+
+    // Fallback image configuration
     pub fallback_image_url: Option<String>,
     pub fallback_image_max_size: usize,
 }
@@ -17,6 +33,14 @@ pub struct EncodingConfig {
 impl EncodingConfig {
     pub fn from_env() -> Self {
         Self {
+            png_compression_level: std::env::var("IMAGE_PROXY_PNG_COMPRESSION_LEVEL")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(6),
+            jpeg_quality: std::env::var("IMAGE_PROXY_JPEG_QUALITY")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(75),
             avif_speed: std::env::var("IMAGE_PROXY_AVIF_SPEED")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -25,18 +49,14 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(75),
-            jpeg_quality: std::env::var("IMAGE_PROXY_JPEG_QUALITY")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(75),
             webp_quality: std::env::var("IMAGE_PROXY_WEBP_QUALITY")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(75.0),
-            png_compression_level: std::env::var("IMAGE_PROXY_PNG_COMPRESSION_LEVEL")
+                .unwrap_or(75),
+            webp_effort: std::env::var("IMAGE_PROXY_WEBP_EFFORT")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(6),
+                .unwrap_or(4),
             resize_algorithm: std::env::var("IMAGE_PROXY_RESIZE_ALGORITHM")
                 .ok()
                 .and_then(|s| ResizeAlgorithm::from_str(&s))

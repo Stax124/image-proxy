@@ -1,4 +1,5 @@
 use image::{DynamicImage, EncodableLayout, ImageEncoder, codecs::png::CompressionType};
+use webp::WebPConfig;
 
 use crate::config::EncodingConfig;
 
@@ -57,7 +58,18 @@ pub fn convert_image_format(
             let rgba = image.into_rgba8();
             let (w, h) = (rgba.width(), rgba.height());
             let encoder = webp::Encoder::from_rgba(rgba.as_raw(), w, h);
-            let webp_data = encoder.encode(config.webp_quality);
+
+            let mut webp_config = WebPConfig::new()
+                .map_err(|e| anyhow::anyhow!("Failed to create WebPConfig: {:?}", e))?;
+            webp_config.lossless = 0;
+            webp_config.alpha_compression = 1;
+            webp_config.quality = config.webp_quality as f32;
+            webp_config.method = config.webp_effort as i32;
+
+            let webp_data = encoder
+                .encode_advanced(&webp_config)
+                .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
+
             buffer.extend_from_slice(&webp_data);
         }
         Some(other) => {
