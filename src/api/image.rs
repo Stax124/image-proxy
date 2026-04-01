@@ -161,7 +161,10 @@ pub async fn process_image_request(
             }
 
             // Otherwise, attempt to load the fallback image and apply transformations to it
-            let fallback_image_body = upstream_response.body().await?;
+            let fallback_image_body = upstream_response
+                .body()
+                .limit(config.fallback_image_max_size)
+                .await?;
             image_bytes = fallback_image_body.to_vec();
         } else {
             return Ok(HttpResponse::NotFound().body("File not found"));

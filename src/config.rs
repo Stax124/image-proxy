@@ -11,6 +11,7 @@ pub struct EncodingConfig {
     pub root_path: String,
     pub strip_path: Option<String>,
     pub fallback_image_url: Option<String>,
+    pub fallback_image_max_size: usize,
 }
 
 impl EncodingConfig {
@@ -44,6 +45,10 @@ impl EncodingConfig {
                 .unwrap_or_else(|_| "/app/data".to_string()),
             strip_path: std::env::var("IMAGE_PROXY_STRIP_PATH").ok(),
             fallback_image_url: std::env::var("IMAGE_PROXY_FALLBACK_IMAGE_URL").ok(),
+            fallback_image_max_size: std::env::var("IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(5 * 1024 * 1024), // Default to 5 MB
         }
     }
 }
