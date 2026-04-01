@@ -27,6 +27,23 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    tracing::info!(
+        "Starting image proxy server version {}",
+        env!("CARGO_PKG_VERSION")
+    );
+    tracing::info!(
+        r"
+ _                                                             
+(_)                                                            
+ _ _ __ ___   __ _  __ _  ___        _ __  _ __ _____  ___   _ 
+| | '_ ` _ \ / _` |/ _` |/ _ \______| '_ \| '__/ _ \ \/ / | | |
+| | | | | | | (_| | (_| |  __/______| |_) | | | (_) >  <| |_| |
+|_|_| |_| |_|\__,_|\__, |\___|      | .__/|_|  \___/_/\_\\__, |
+                    __/ |           | |                   __/ |
+                   |___/            |_|                  |___/ 
+    "
+    );
+
     let config = Arc::new(EncodingConfig::from_env());
 
     HttpServer::new(move || {
