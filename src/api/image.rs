@@ -7,6 +7,7 @@ use crate::{
     utils::{load_bytes_from_disk, mime_type_for_format},
 };
 use actix_web::{HttpMessage, HttpResponse, web};
+use foyer::HybridCache;
 use futures_util::TryStreamExt;
 use tokio_util::io::ReaderStream;
 
@@ -19,6 +20,7 @@ pub async fn process_image_request(
     query_params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<Arc<EncodingConfig>>,
     http_client: web::Data<awc::Client>,
+    cache: web::Data<Option<HybridCache<String, Vec<u8>>>>,
 ) -> actix_web::Result<HttpResponse> {
     // Strip the specified path from the filename if configured
     let filename = if let Some(strip_path) = &config.strip_path {
@@ -72,32 +74,6 @@ pub async fn process_image_request(
     let resize_algorithm_param = query_params
         .get("resize_algorithm")
         .and_then(|s| ResizeAlgorithm::from_str(s));
-
-    // Stream local files directly when no transformation is requested.
-    if query_params.is_empty() && sanitized_disk_path.exists() {
-        let content_type = mime_type_for_format(file_ext.as_deref());
-
-        let metadata = tokio::fs::metadata(&sanitized_disk_path)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to read file metadata: {}", e);
-                actix_web::error::ErrorInternalServerError("Failed to read file metadata")
-            })?;
-        let size = metadata.len();
-
-        let file = tokio::fs::File::open(&sanitized_disk_path)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to open file: {}", e);
-                actix_web::error::ErrorInternalServerError("Failed to open file")
-            })?;
-        let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
-
-        return Ok(HttpResponse::Ok()
-            .content_type(content_type)
-            .insert_header(("Content-Length", size.to_string()))
-            .streaming(stream));
-    }
 
     // Stream local files directly when no transformation is requested.
     if query_params.is_empty() && sanitized_disk_path.exists() {
@@ -182,6 +158,26 @@ pub async fn process_image_request(
     let effective_format = format_param.or(file_ext).unwrap_or_default();
     let content_type = mime_type_for_format(Some(effective_format.as_str()));
 
+    // Build a cache key from the path and transformation parameters
+    let cache_key = format!(
+        "{}?format={}&size={}&resize={}",
+        sanitized_path.display(),
+        effective_format,
+        size_param.map_or_else(|| "none".to_string(), |s| s.to_string()),
+        resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
+    );
+
+    // Check the cache if it is configured before doing expensive work
+    if let Some(cache) = cache.get_ref() {
+        if let Ok(Some(entry)) = cache.get(&cache_key).await {
+            tracing::debug!(cache_key = %cache_key, "cache hit");
+            return Ok(HttpResponse::Ok()
+                .content_type(content_type)
+                .insert_header(("X-Cache", "HIT"))
+                .body(entry.value().clone()));
+        }
+    }
+
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
     let config = config.get_ref().clone();
     let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
@@ -201,7 +197,13 @@ pub async fn process_image_request(
         actix_web::error::ErrorInternalServerError(format!("Failed to convert image: {}", e))
     })?;
 
+    // Store the transformed result in cache
+    if let Some(cache) = cache.get_ref() {
+        cache.insert(cache_key, result_image_bytes.clone());
+    }
+
     Ok(HttpResponse::Ok()
         .content_type(content_type)
+        .insert_header(("X-Cache", "MISS"))
         .body(result_image_bytes))
 }

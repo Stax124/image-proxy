@@ -7,8 +7,11 @@ edition = "2024"
 actix-web = "4.13.0"
 anyhow = "1.0.102"
 awc = { version = "3.8.2", features = ["rustls"] }
+foyer = "0.22.3"
 futures-util = "0.3.31"
 image = { version = "*", features = ["nasm", "avif-native"] }
+mixtrics = { version = "0.2.3", features = ["prometheus"] }
+prometheus = "0.14.0"
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = "0.7.16"
 tracing = "0.1.44"

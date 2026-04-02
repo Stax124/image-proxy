@@ -28,6 +28,20 @@ pub struct EncodingConfig {
     // Fallback image configuration
     pub fallback_image_url: Option<String>,
     pub fallback_image_max_size: usize,
+
+    // Cache configuration
+    /// Whether to enable caching at all
+    pub enable_cache: bool,
+    /// Memory cache size in bytes
+    pub cache_memory_size: usize,
+    /// Whether to enable disk caching
+    pub enable_disk_cache: bool,
+    /// Pre-allocated disk cache size in bytes
+    pub cache_disk_size: usize,
+    /// Cache disk path
+    pub cache_disk_path: String,
+    /// Maximum size of items to store in memory (in bytes)
+    pub cache_memory_max_item_size: usize,
 }
 
 impl EncodingConfig {
@@ -69,6 +83,28 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(5 * 1024 * 1024), // Default to 5 MB
+            enable_cache: std::env::var("IMAGE_PROXY_ENABLE_CACHE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(false),
+            cache_memory_size: std::env::var("IMAGE_PROXY_CACHE_MEMORY_SIZE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(100 * 1024 * 1024), // Default to 100 MB
+            enable_disk_cache: std::env::var("IMAGE_PROXY_ENABLE_DISK_CACHE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(false),
+            cache_disk_size: std::env::var("IMAGE_PROXY_CACHE_DISK_SIZE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(512 * 1024 * 1024), // Default to 512 MB
+            cache_disk_path: std::env::var("IMAGE_PROXY_CACHE_DISK_PATH")
+                .unwrap_or_else(|_| "./cache".to_string()),
+            cache_memory_max_item_size: std::env::var("IMAGE_PROXY_CACHE_MAX_ITEM_SIZE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1 * 1024 * 1024), // Default to 1 MB
         }
     }
 }
