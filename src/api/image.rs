@@ -46,9 +46,10 @@ pub async fn process_image_request(
         .extension()
         .and_then(|e| e.to_str())
         .map(|s| s.to_lowercase());
-    if let Some(ext) = &file_ext
-        && !SUPPORTED_FORMATS.contains(&ext.as_str())
-    {
+    let Some(ext) = &file_ext else {
+        return Ok(HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format"));
+    };
+    if !SUPPORTED_FORMATS.contains(&ext.as_str()) {
         return Ok(
             HttpResponse::UnsupportedMediaType().body(format!("Unsupported file format: {}", ext))
         );
@@ -131,8 +132,8 @@ pub async fn process_image_request(
             && !config.fallback_image_url.as_ref().unwrap().is_empty()
         {
             let url = match &config.fallback_image_url {
-                Some(base_url) => format!("{}{}", base_url, filename),
-                None => filename.to_string(),
+                Some(base_url) => format!("{}{}", base_url, sanitized_path.display()),
+                None => sanitized_path.display().to_string(),
             };
 
             let mut upstream_response = http_client.get(&url).send().await.map_err(|e| {
