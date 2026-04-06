@@ -90,7 +90,7 @@ pub async fn process_image_request(
         resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
     );
 
-    // Check the cache if it is configured before doing expensive work
+    // Check cache for a hit before doing any expensive work
     if let Some(cache) = cache.get_ref() {
         if let Ok(Some(entry)) = cache.get(&cache_key).await {
             tracing::debug!(cache_key = %cache_key, "cache hit");
