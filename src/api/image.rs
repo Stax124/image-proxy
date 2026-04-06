@@ -9,7 +9,7 @@ use crate::{
 use actix_web::{HttpMessage, HttpResponse, web};
 use foyer::HybridCache;
 use futures_util::TryStreamExt;
-use prometheus::HistogramVec;
+use prometheus::{HistogramVec, IntCounterVec};
 use tokio_util::io::ReaderStream;
 
 const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
@@ -23,6 +23,7 @@ pub async fn process_image_request(
     http_client: web::Data<awc::Client>,
     cache: web::Data<Option<HybridCache<String, Vec<u8>>>>,
     pipeline_duration: web::Data<HistogramVec>,
+    request_count: web::Data<IntCounterVec>,
 ) -> actix_web::Result<HttpResponse> {
     // Strip the specified path from the filename if configured
     let filename = if let Some(strip_path) = &config.strip_path {
@@ -51,9 +52,15 @@ pub async fn process_image_request(
         .and_then(|e| e.to_str())
         .map(|s| s.to_lowercase());
     let Some(ext) = &file_ext else {
+        request_count
+            .with_label_values(&["unknown", "unsupported_media_type"])
+            .inc();
         return Ok(HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format"));
     };
     if !SUPPORTED_FORMATS.contains(&ext.as_str()) {
+        request_count
+            .with_label_values(&[ext.as_str(), "unsupported_media_type"])
+            .inc();
         return Ok(
             HttpResponse::UnsupportedMediaType().body(format!("Unsupported file format: {}", ext))
         );
@@ -94,6 +101,9 @@ pub async fn process_image_request(
     if let Some(cache) = cache.get_ref() {
         if let Ok(Some(entry)) = cache.get(&cache_key).await {
             tracing::debug!(cache_key = %cache_key, "cache hit");
+            request_count
+                .with_label_values(&[effective_format.as_str(), "ok"])
+                .inc();
             return Ok(HttpResponse::Ok()
                 .content_type(content_type)
                 .insert_header(("X-Cache", "HIT"))
@@ -109,6 +119,9 @@ pub async fn process_image_request(
             .await
             .map_err(|e| {
                 tracing::error!("Failed to read file metadata: {}", e);
+                request_count
+                    .with_label_values(&[ext.as_str(), "error"])
+                    .inc();
                 actix_web::error::ErrorInternalServerError("Failed to read file metadata")
             })?;
         let size = metadata.len();
@@ -117,10 +130,14 @@ pub async fn process_image_request(
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open file: {}", e);
+                request_count
+                    .with_label_values(&[ext.as_str(), "error"])
+                    .inc();
                 actix_web::error::ErrorInternalServerError("Failed to open file")
             })?;
         let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
 
+        request_count.with_label_values(&[ext.as_str(), "ok"]).inc();
         return Ok(HttpResponse::Ok()
             .content_type(content_type)
             .insert_header(("Content-Length", size.to_string()))
@@ -170,6 +187,9 @@ pub async fn process_image_request(
                 .await?;
             image_bytes = fallback_image_body.to_vec();
         } else {
+            request_count
+                .with_label_values(&[ext.as_str(), "not_found"])
+                .inc();
             return Ok(HttpResponse::NotFound().body("File not found"));
         }
     } else {
@@ -183,6 +203,7 @@ pub async fn process_image_request(
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
     let config = config.get_ref().clone();
     let pipeline_duration = pipeline_duration.get_ref().clone();
+    let effective_format_clone = effective_format.clone();
     let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
         let image = {
             let _timer = pipeline_duration
@@ -193,7 +214,7 @@ pub async fn process_image_request(
         let bytes = crate::operations::pipeline::image_pipeline(
             image,
             size_param,
-            &effective_format,
+            &effective_format_clone,
             &config,
             resize_algorithm_param,
             Some(&pipeline_duration),
@@ -211,6 +232,9 @@ pub async fn process_image_request(
         cache.insert(cache_key, result_image_bytes.clone());
     }
 
+    request_count
+        .with_label_values(&[effective_format.as_str(), "ok"])
+        .inc();
     Ok(HttpResponse::Ok()
         .content_type(content_type)
         .insert_header(("X-Cache", "MISS"))

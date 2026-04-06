@@ -1,7 +1,20 @@
-use prometheus::{HistogramOpts, HistogramVec, Registry};
+use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, Opts, Registry};
 
-pub fn setup_metrics() -> (Registry, HistogramVec) {
+pub fn setup_metrics() -> (Registry, HistogramVec, IntCounterVec) {
     let prometheus_registry = Registry::new();
+
+    let request_count = IntCounterVec::new(
+        Opts::new(
+            "image_requests_total",
+            "Total number of requests to the image transformation endpoint",
+        ),
+        &["format", "status"],
+    )
+    .expect("failed to create request count counter");
+
+    prometheus_registry
+        .register(Box::new(request_count.clone()))
+        .expect("failed to register request count counter");
 
     let pipeline_duration = HistogramVec::new(
         HistogramOpts::new(
@@ -19,5 +32,5 @@ pub fn setup_metrics() -> (Registry, HistogramVec) {
         .register(Box::new(pipeline_duration.clone()))
         .expect("failed to register pipeline duration histogram");
 
-    (prometheus_registry, pipeline_duration)
+    (prometheus_registry, pipeline_duration, request_count)
 }
