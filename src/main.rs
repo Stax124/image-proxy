@@ -18,7 +18,7 @@ mod utils;
 async fn main() -> anyhow::Result<()> {
     crate::logs::setup_tracing();
     let config = Arc::new(EncodingConfig::from_env());
-    let prometheus_registry = crate::metrics::setup_metrics();
+    let (prometheus_registry, pipeline_duration) = crate::metrics::setup_metrics();
     let hybrid_cache = crate::cache::setup_cache(&config, &prometheus_registry).await?;
 
     HttpServer::new(move || {
@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(config.clone()))
             .app_data(web::Data::new(hybrid_cache.clone()))
             .app_data(web::Data::new(prometheus_registry.clone()))
+            .app_data(web::Data::new(pipeline_duration.clone()))
             .wrap(middleware::Logger::new("%a %r %s %b %D"))
             .service(metrics_handler)
             .service(process_image_request)

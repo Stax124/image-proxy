@@ -9,6 +9,7 @@ use crate::{
 use actix_web::{HttpMessage, HttpResponse, web};
 use foyer::HybridCache;
 use futures_util::TryStreamExt;
+use prometheus::HistogramVec;
 use tokio_util::io::ReaderStream;
 
 const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
@@ -21,6 +22,7 @@ pub async fn process_image_request(
     config: web::Data<Arc<EncodingConfig>>,
     http_client: web::Data<awc::Client>,
     cache: web::Data<Option<HybridCache<String, Vec<u8>>>>,
+    pipeline_duration: web::Data<HistogramVec>,
 ) -> actix_web::Result<HttpResponse> {
     // Strip the specified path from the filename if configured
     let filename = if let Some(strip_path) = &config.strip_path {
@@ -180,14 +182,19 @@ pub async fn process_image_request(
 
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
     let config = config.get_ref().clone();
+    let pipeline_duration = pipeline_duration.get_ref().clone();
     let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
-        let image = image::load_from_memory(&image_bytes)?;
+        let image = {
+            let _timer = pipeline_duration.with_label_values(&["decode"]).start_timer();
+            image::load_from_memory(&image_bytes)?
+        };
         let bytes = crate::operations::pipeline::image_pipeline(
             image,
             size_param,
             &effective_format,
             &config,
             resize_algorithm_param,
+            Some(&pipeline_duration),
         )?;
         Ok(bytes)
     })
