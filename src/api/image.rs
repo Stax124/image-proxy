@@ -77,6 +77,30 @@ pub async fn process_image_request(
         .get("resize_algorithm")
         .and_then(|s| ResizeAlgorithm::from_str(s));
 
+    // Use the explicitly requested format, or fall back to the original file's format
+    let effective_format = format_param.or(file_ext.clone()).unwrap_or_default();
+    let content_type = mime_type_for_format(Some(effective_format.as_str()));
+
+    // Build a cache key from the path and transformation parameters
+    let cache_key = format!(
+        "{}?format={}&size={}&resize={}",
+        sanitized_path.display(),
+        effective_format,
+        size_param.map_or_else(|| "none".to_string(), |s| s.to_string()),
+        resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
+    );
+
+    // Check the cache if it is configured before doing expensive work
+    if let Some(cache) = cache.get_ref() {
+        if let Ok(Some(entry)) = cache.get(&cache_key).await {
+            tracing::debug!(cache_key = %cache_key, "cache hit");
+            return Ok(HttpResponse::Ok()
+                .content_type(content_type)
+                .insert_header(("X-Cache", "HIT"))
+                .body(entry.value().clone()));
+        }
+    }
+
     // Stream local files directly when no transformation is requested.
     if query_params.is_empty() && sanitized_disk_path.exists() {
         let content_type = mime_type_for_format(file_ext.as_deref());
@@ -156,36 +180,14 @@ pub async fn process_image_request(
             .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?;
     }
 
-    // Use the explicitly requested format, or fall back to the original file's format
-    let effective_format = format_param.or(file_ext).unwrap_or_default();
-    let content_type = mime_type_for_format(Some(effective_format.as_str()));
-
-    // Build a cache key from the path and transformation parameters
-    let cache_key = format!(
-        "{}?format={}&size={}&resize={}",
-        sanitized_path.display(),
-        effective_format,
-        size_param.map_or_else(|| "none".to_string(), |s| s.to_string()),
-        resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
-    );
-
-    // Check the cache if it is configured before doing expensive work
-    if let Some(cache) = cache.get_ref() {
-        if let Ok(Some(entry)) = cache.get(&cache_key).await {
-            tracing::debug!(cache_key = %cache_key, "cache hit");
-            return Ok(HttpResponse::Ok()
-                .content_type(content_type)
-                .insert_header(("X-Cache", "HIT"))
-                .body(entry.value().clone()));
-        }
-    }
-
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
     let config = config.get_ref().clone();
     let pipeline_duration = pipeline_duration.get_ref().clone();
     let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
         let image = {
-            let _timer = pipeline_duration.with_label_values(&["decode"]).start_timer();
+            let _timer = pipeline_duration
+                .with_label_values(&["decode"])
+                .start_timer();
             image::load_from_memory(&image_bytes)?
         };
         let bytes = crate::operations::pipeline::image_pipeline(
