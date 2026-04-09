@@ -8,6 +8,8 @@ ARG RUST_VERSION=1.92
 
 FROM docker.io/library/rust:${RUST_VERSION}-alpine AS build
 
+ARG TARGETARCH
+
 # All build steps happen inside /app.
 WORKDIR /app
 
