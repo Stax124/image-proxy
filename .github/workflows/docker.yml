@@ -75,6 +75,7 @@ jobs:
         name: Create final manifest
         needs: build
         runs-on: ubuntu-latest
+        if: always() && (needs.build.result == 'success')
         steps:
             - name: Log in to the Container registry
               uses: docker/login-action@v4
