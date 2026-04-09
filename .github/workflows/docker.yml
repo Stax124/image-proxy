@@ -28,8 +28,8 @@ jobs:
                   submodules: recursive
             - name: Check Cargo Version Matches Tag
               uses: spice-labs-inc/action-check-version@main
-    build-and-push:
-        name: Build and push (${{ matrix.platform }})
+    build:
+        name: Build (${{ matrix.platform }})
         runs-on: ${{ matrix.runner }}
         needs: check-version
         if: always() && (needs.check-version.result == 'success' || needs.check-version.result == 'skipped')
@@ -39,8 +39,10 @@ jobs:
                 include:
                     - platform: linux/amd64
                       runner: ubuntu-latest
+                      arch: amd64
                     - platform: linux/arm64
                       runner: ubuntu-24.04-arm
+                      arch: arm64
         permissions:
             contents: read
             packages: write
@@ -56,24 +58,39 @@ jobs:
                   registry: ${{ env.REGISTRY }}
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Extract metadata (tags, labels)
-              id: meta
-              uses: docker/metadata-action@v6
-              with:
-                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-                  tags: |
-                      type=semver,pattern={{version}}
-                      type=raw,value=latest,enable={{is_default_branch}}
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v4
-            - name: Build and push Docker image
+            - name: Build Docker image
               uses: docker/build-push-action@v7
               with:
                   context: .
                   file: ./Dockerfile
                   platforms: ${{ matrix.platform }}
                   push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
+                  tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-${{ matrix.arch }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+
+    manifest:
+        name: Create final manifest
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Log in to the Container registry
+              uses: docker/login-action@v4
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Create and push multi-arch manifest
+              run: |
+                  docker buildx imagetools create \
+                  -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+                  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
+                  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+            - name: Tag as latest (on main branch)
+              if: github.ref == 'refs/heads/main'
+              run: |
+                  docker buildx imagetools create \
+                  -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+                  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
