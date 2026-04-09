@@ -14,7 +14,7 @@ concurrency:
 env:
     CARGO_TERM_COLOR: always
     REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository | lower }}
+    IMAGE_NAME: stax124/image-proxy
 
 jobs:
     check-version:
