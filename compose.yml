@@ -4,8 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-      args:
-        APP_NAME: image-proxy
     ports:
       - "8000:8000"
     volumes:
