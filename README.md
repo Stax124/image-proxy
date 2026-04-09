@@ -18,13 +18,16 @@ A lightweight HTTP image-serving and transformation proxy written in Rust.
 
 Serves the image at `{IMAGE_PROXY_ROOT_PATH}/{filename}`.
 
-| Query Parameter    | Type     | Description                                                               |
-| ------------------ | -------- | ------------------------------------------------------------------------- |
-| `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `png`, `webp`                       |
-| `size`             | `u32`    | Max bounding-box dimension in pixels (aspect ratio preserved)             |
-| `resize_algorithm` | `string` | Per-request resize algorithm override: `lanczos3`, `thumbnail`, or `auto` |
+| Query Parameter    | Type     | Description                                                                                                                                                           |
+| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `png`, `webp`                                                                                                                   |
+| `size`             | `u32`    | Max bounding-box dimension in pixels (aspect ratio preserved)                                                                                                         |
+| `resize_algorithm` | `string` | Per-request resize algorithm override: `lanczos3`, `thumbnail`, or `auto`                                                                                             |
+| `dpr`              | `f64`    | Device pixel ratio (1.0–10.0). Multiplies `size` to produce the actual output dimension (useful for high-DPI displays where 1px in CSS can be multiple device pixels) |
 
-If neither parameter is provided, the raw file bytes are returned unchanged (no decoding).
+The `dpr` value can also be supplied via the [`Sec-CH-DPR`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-CH-DPR) request header. Priority order: **query parameter > header**.
+
+If no transformation parameter is provided, the raw file bytes are returned unchanged (no decoding).
 
 **Examples:**
 
@@ -34,6 +37,14 @@ GET /photos/sample.jpg?size=400      # resize to fit 400×400 box (keeps the asp
 GET /photos/sample.jpg?format=avif   # convert to AVIF
 GET /photos/sample.jpg?size=400&format=webp  # resize + convert to WebP
 GET /photos/sample.jpg?size=400&resize_algorithm=lanczos3  # resize with Lanczos3
+GET /photos/sample.jpg?size=400&dpr=2          # resize to 800px (400 × 2.0)
+```
+
+Alternatively, pass the DPR via the client-hint header:
+
+```
+GET /photos/sample.jpg?size=400
+Sec-CH-DPR: 2.0
 ```
 
 ### `GET /metrics`

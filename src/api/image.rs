@@ -6,7 +6,7 @@ use crate::{
     operations::resize::ResizeAlgorithm,
     utils::{load_bytes_from_disk, mime_type_for_format},
 };
-use actix_web::{HttpMessage, HttpResponse, web};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use foyer::HybridCache;
 use futures_util::TryStreamExt;
 use prometheus::{HistogramVec, IntCounterVec};
@@ -17,6 +17,7 @@ const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
 #[actix_web::get("/{filename:.*}")]
 #[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
 pub async fn process_image_request(
+    req: HttpRequest,
     filename: web::Path<String>,
     query_params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<Arc<EncodingConfig>>,
@@ -66,6 +67,12 @@ pub async fn process_image_request(
         );
     }
 
+    // Special headers that can influence processing
+    let sec_ch_dpr = req
+        .headers()
+        .get("Sec-CH-DPR")
+        .and_then(|v| v.to_str().ok());
+
     tracing::debug!(
         query_params = ?query_params,
         strip_path = ?config.strip_path,
@@ -73,13 +80,27 @@ pub async fn process_image_request(
         sanitized_path = ?sanitized_path,
         sanitized_disk_path = ?sanitized_disk_path,
         filename = ?filename,
+        sec_ch_dpr = ?sec_ch_dpr
     );
 
     let format_param = query_params.get("format").map(|s| s.to_lowercase());
+    let dpr_param = query_params
+        .get("dpr")
+        .and_then(|s| s.parse::<f64>().ok())
+        .or_else(|| sec_ch_dpr.and_then(|dpr_str| dpr_str.parse::<f64>().ok()))
+        .filter(|&d| (1.0..=10.0).contains(&d));
     let size_param = query_params
         .get("size")
         .and_then(|s| s.parse::<u32>().ok())
-        .filter(|&s| s > 0);
+        .filter(|&s| s > 0)
+        .map(|s| {
+            if let Some(dpr) = dpr_param {
+                (s as f64 * dpr).round() as u32
+            } else {
+                s
+            }
+        });
+
     let resize_algorithm_param = query_params
         .get("resize_algorithm")
         .and_then(|s| ResizeAlgorithm::from_str(s));
@@ -90,11 +111,12 @@ pub async fn process_image_request(
 
     // Build a cache key from the path and transformation parameters
     let cache_key = format!(
-        "{}?format={}&size={}&resize={}",
+        "{}?format={}&size={}&resize={}&dpr={}",
         sanitized_path.display(),
         effective_format,
         size_param.map_or_else(|| "none".to_string(), |s| s.to_string()),
         resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
+        dpr_param.map_or_else(|| "none".to_string(), |d| format!("{:.2}", d)),
     );
 
     // Check cache for a hit before doing any expensive work
