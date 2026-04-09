@@ -129,6 +129,7 @@ pub async fn process_image_request(
             return Ok(HttpResponse::Ok()
                 .content_type(content_type)
                 .insert_header(("X-Cache", "HIT"))
+                .insert_header(("Vary", "Sec-CH-DPR"))
                 .body(entry.value().clone()));
         }
     }
@@ -163,6 +164,7 @@ pub async fn process_image_request(
         return Ok(HttpResponse::Ok()
             .content_type(content_type)
             .insert_header(("Content-Length", size.to_string()))
+            .insert_header(("Vary", "Sec-CH-DPR"))
             .streaming(stream));
     }
 
@@ -199,6 +201,7 @@ pub async fn process_image_request(
                 // Return a streaming response for the fallback image if no transformations are requested
                 return Ok(HttpResponse::Ok()
                     .content_type(upstream_response.content_type())
+                    .insert_header(("Vary", "Sec-CH-DPR"))
                     .streaming(upstream_response));
             }
 
@@ -260,5 +263,6 @@ pub async fn process_image_request(
     Ok(HttpResponse::Ok()
         .content_type(content_type)
         .insert_header(("X-Cache", "MISS"))
+        .insert_header(("Vary", "Sec-CH-DPR"))
         .body(result_image_bytes))
 }
