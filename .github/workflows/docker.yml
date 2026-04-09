@@ -68,8 +68,8 @@ jobs:
                   platforms: ${{ matrix.platform }}
                   push: true
                   tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-${{ matrix.arch }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+                  cache-from: type=gha,scope=${{ matrix.arch }}
+                  cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
     manifest:
         name: Create final manifest

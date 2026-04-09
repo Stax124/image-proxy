@@ -18,11 +18,13 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 webp = "0.3.1"
 
-[profile.release-optimized]
-inherits = "release"
+[profile.release.package."*"]
+opt-level = 3
+codegen-units = 1
+
+[profile.release]
 opt-level = 3
 lto = true
-codegen-units = 1
 
 [patch.crates-io]
 image = { path = "./image" }

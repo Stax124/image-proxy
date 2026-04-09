@@ -1,0 +1,22 @@
+# Build artifacts
+target/
+
+# Docker files
+Dockerfile
+compose.yml
+.dockerignore
+
+# Data directory
+data/
+
+# Documentation and metadata
+README.md
+LICENSE
+
+# Git
+.git/
+.gitignore
+
+# Editor/IDE
+.vscode/
+.idea/

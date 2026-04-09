@@ -1,16 +1,8 @@
-# Pin the Rust toolchain version used in the build stage.
-ARG RUST_VERSION=1.92
-
 ################################################################################
-# Build stage (DOI Rust image)
-# This stage compiles the application.
+# Chef stage (pre-built cargo-chef image)
 ################################################################################
 
-FROM docker.io/library/rust:${RUST_VERSION}-alpine AS build
-
-ARG TARGETARCH
-
-# All build steps happen inside /app.
+FROM lukemathwalker/cargo-chef:latest-rust-1.92.0-alpine AS chef
 WORKDIR /app
 
 # Install build dependencies needed to compile Rust crates on Alpine
@@ -19,16 +11,33 @@ RUN apk add --no-cache clang lld git nasm dav1d-dev pkgconfig musl-dev
 # Disable static linking to avoid issues with libdav1d
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
-# Build the application 
-RUN --mount=type=bind,source=src,target=src \
-    --mount=type=bind,source=image,target=image \
-    --mount=type=bind,source=Cargo.toml,target=Cargo.toml \
-    --mount=type=bind,source=Cargo.lock,target=Cargo.lock \
-    --mount=type=cache,target=/app/target/,id=cargo-target-${TARGETARCH} \
-    --mount=type=cache,target=/usr/local/cargo/git/db \
-    --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --locked --profile release-optimized && \
-    cp ./target/release-optimized/image-proxy /bin/image-proxy
+################################################################################
+# Planner stage
+# Analyze the project and produce a recipe file.
+################################################################################
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+################################################################################
+# Builder stage
+# Cache dependencies and compile the application.
+################################################################################
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+
+# Copy the local path dependency needed by [patch.crates-io]
+COPY image/ image/
+
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Build application
+COPY . .
+RUN cargo build --locked --release && \
+    cp ./target/release/image-proxy /bin/image-proxy
 
 ################################################################################
 # Runtime stage (DOI Alpine image)
@@ -58,7 +67,7 @@ USER appuser
 WORKDIR /app
 
 # Copy only the compiled binary from the build stage.
-COPY --from=build /bin/image-proxy /bin/image-proxy
+COPY --from=builder /bin/image-proxy /bin/image-proxy
 
 # Document the port your app listens on.
 EXPOSE 8000
