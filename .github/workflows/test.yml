@@ -1,28 +1,37 @@
 name: Rust Tests
 
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-        branches: ["main"]
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
-    contents: read
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-    CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: always
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.92.0
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.92.0
 
-            - name: Cache Rust dependencies
-              uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        run: sudo apt install -y libdav1d7 libdav1d-dev nasm
 
-            - name: Run tests
-              run: cargo test --all-features --verbose
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test

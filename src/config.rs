@@ -1,6 +1,6 @@
 use crate::operations::resize::ResizeAlgorithm;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EncodingConfig {
     // JPEG encoding parameters
     pub jpeg_quality: u8,
@@ -105,6 +105,30 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(1 * 1024 * 1024), // Default to 1 MB
+        }
+    }
+}
+
+impl Default for EncodingConfig {
+    fn default() -> Self {
+        Self {
+            jpeg_quality: 75,
+            png_compression_level: 6,
+            avif_quality: 75,
+            avif_speed: 7,
+            webp_quality: 75,
+            webp_effort: 4,
+            resize_algorithm: ResizeAlgorithm::Auto,
+            root_path: "/tmp/test-images".to_string(),
+            strip_path: None,
+            fallback_image_url: None,
+            fallback_image_max_size: 5 * 1024 * 1024,
+            enable_cache: false,
+            cache_memory_size: 100 * 1024 * 1024,
+            enable_disk_cache: false,
+            cache_disk_size: 512 * 1024 * 1024,
+            cache_disk_path: "./cache".to_string(),
+            cache_memory_max_item_size: 1024 * 1024,
         }
     }
 }
