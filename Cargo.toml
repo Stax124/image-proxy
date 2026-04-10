@@ -4,19 +4,19 @@ version = "0.17.0"
 edition = "2024"
 
 [dependencies]
-actix-web = "4.13.0"
-anyhow = "1.0.102"
-awc = { version = "3.8.2", features = ["rustls"] }
-foyer = "0.22.3"
-futures-util = "0.3.31"
+actix-web = "4"
+anyhow = "1"
+awc = { version = "3.8", features = ["rustls"] }
+foyer = "0.22"
+futures-util = "0.3"
 image = { version = "*", features = ["nasm", "avif-native"] }
-mixtrics = { version = "0.2.3", features = ["prometheus"] }
-prometheus = "0.14.0"
-tokio = { version = "1.51.1", features = ["full"] }
-tokio-util = "0.7.16"
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-webp = "0.3.1"
+mixtrics = { version = "0.2", features = ["prometheus"] }
+prometheus = "0.14"
+tokio = { version = "1.51", features = ["full"] }
+tokio-util = "0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+webp = "0.3"
 
 [dev-dependencies]
 tempfile = "3"
