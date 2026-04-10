@@ -82,3 +82,126 @@ pub fn resize_image(
         ResizeAlgorithm::Auto => unreachable!(), // Already handled above
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::EncodingConfig;
+
+    fn test_config() -> EncodingConfig {
+        EncodingConfig::default()
+    }
+
+    fn make_image(w: u32, h: u32) -> DynamicImage {
+        DynamicImage::new_rgba8(w, h)
+    }
+
+    // --- ResizeAlgorithm::from_str ---
+
+    #[test]
+    fn from_str_lanczos3() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("lanczos3"),
+            Some(ResizeAlgorithm::Lanczos3)
+        );
+    }
+
+    #[test]
+    fn from_str_thumbnail() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("thumbnail"),
+            Some(ResizeAlgorithm::Thumbnail)
+        );
+    }
+
+    #[test]
+    fn from_str_auto() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("auto"),
+            Some(ResizeAlgorithm::Auto)
+        );
+    }
+
+    #[test]
+    fn from_str_case_insensitive() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("LANCZOS3"),
+            Some(ResizeAlgorithm::Lanczos3)
+        );
+        assert_eq!(
+            ResizeAlgorithm::from_str("Thumbnail"),
+            Some(ResizeAlgorithm::Thumbnail)
+        );
+        assert_eq!(
+            ResizeAlgorithm::from_str("AUTO"),
+            Some(ResizeAlgorithm::Auto)
+        );
+    }
+
+    #[test]
+    fn from_str_invalid() {
+        assert_eq!(ResizeAlgorithm::from_str(""), None);
+        assert_eq!(ResizeAlgorithm::from_str("bilinear"), None);
+        assert_eq!(ResizeAlgorithm::from_str("nearest"), None);
+    }
+
+    // --- resize_image ---
+
+    #[test]
+    fn resize_no_size_returns_original() {
+        let img = make_image(100, 200);
+        let config = test_config();
+        let result = resize_image(img, None, None, &config);
+        assert_eq!(result.width(), 100);
+        assert_eq!(result.height(), 200);
+    }
+
+    #[test]
+    fn resize_zero_size_returns_original() {
+        let img = make_image(100, 200);
+        let config = test_config();
+        let result = resize_image(img, Some(0), None, &config);
+        assert_eq!(result.width(), 100);
+        assert_eq!(result.height(), 200);
+    }
+
+    #[test]
+    fn resize_does_not_upscale() {
+        let img = make_image(50, 50);
+        let config = test_config();
+        let result = resize_image(img, Some(200), Some(ResizeAlgorithm::Thumbnail), &config);
+
+        assert_eq!(result.width(), 50);
+        assert_eq!(result.height(), 50);
+    }
+
+    #[test]
+    fn resize_thumbnail_downscale() {
+        let img = make_image(1000, 500);
+        let config = test_config();
+        let result = resize_image(img, Some(200), Some(ResizeAlgorithm::Thumbnail), &config);
+
+        assert_eq!(result.width(), 200);
+        assert_eq!(result.height(), 100);
+    }
+
+    #[test]
+    fn resize_lanczos3_landscape() {
+        let img = make_image(1000, 500);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Lanczos3), &config);
+
+        assert_eq!(result.width(), 400);
+        assert_eq!(result.height(), 200);
+    }
+
+    #[test]
+    fn resize_lanczos3_portrait() {
+        let img = make_image(500, 1000);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Lanczos3), &config);
+
+        assert_eq!(result.height(), 400);
+        assert_eq!(result.width(), 200);
+    }
+}

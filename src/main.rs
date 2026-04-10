@@ -2,24 +2,17 @@ use std::{sync::Arc, time::Duration};
 
 use actix_web::{App, HttpServer, middleware, web};
 
-use crate::{
+use image_proxy::{
     api::image::process_image_request, api::metrics::metrics_handler, config::EncodingConfig,
 };
 
-mod api;
-mod cache;
-mod config;
-mod logs;
-mod metrics;
-mod operations;
-mod utils;
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
-    crate::logs::setup_tracing();
+    image_proxy::logs::setup_tracing();
     let config = Arc::new(EncodingConfig::from_env());
-    let (prometheus_registry, pipeline_duration, request_count) = crate::metrics::setup_metrics();
-    let hybrid_cache = crate::cache::setup_cache(&config, &prometheus_registry).await?;
+    let (prometheus_registry, pipeline_duration, request_count) = image_proxy::metrics::setup_metrics();
+    let hybrid_cache = image_proxy::cache::setup_cache(&config, &prometheus_registry).await?;
 
     HttpServer::new(move || {
         let http_client = awc::ClientBuilder::new()
