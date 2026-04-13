@@ -58,15 +58,15 @@ impl EncodingConfig {
             avif_speed: std::env::var("IMAGE_PROXY_AVIF_SPEED")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(7),
+                .unwrap_or(6),
             avif_quality: std::env::var("IMAGE_PROXY_AVIF_QUALITY")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(75),
+                .unwrap_or(85),
             webp_quality: std::env::var("IMAGE_PROXY_WEBP_QUALITY")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(75),
+                .unwrap_or(80),
             webp_effort: std::env::var("IMAGE_PROXY_WEBP_EFFORT")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -114,9 +114,9 @@ impl Default for EncodingConfig {
         Self {
             jpeg_quality: 75,
             png_compression_level: 6,
-            avif_quality: 75,
-            avif_speed: 7,
-            webp_quality: 75,
+            avif_quality: 85,
+            avif_speed: 6,
+            webp_quality: 80,
             webp_effort: 4,
             resize_algorithm: ResizeAlgorithm::Auto,
             root_path: "/tmp/test-images".to_string(),
