@@ -77,7 +77,31 @@ All settings are provided via environment variables.
 | `IMAGE_PROXY_CACHE_DISK_PATH`         | `./cache`            | Directory for the disk cache                                                                                                                              |
 | `RUST_LOG`                            | `INFO`               | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                                     |
 
-## Running
+## Production Deployment
+
+Project has been tested and dockerized for deployment on Linux. For production use, it is recommended to use `Kubernetes` or `Docker Compose / Swarm` with a reverse proxy like `Traefik` in front of it to handle TLS termination and routing.
+
+## How to properly utilize this project
+
+**This project should generally be used behind a CDN** like `Cloudflare` or `Fastly` that can cache the transformed images at the edge, significantly improving performance and reducing load on the image-proxy service. The image-proxy should be configured to allow caching of transformed images (e.g. by setting appropriate `Cache-Control` headers) and the CDN should be set up to cache responses based on the query parameters (e.g. `size`, `format`) to ensure that different transformations are cached separately. Most CDNs are configured to cache image based endpoints automatically, so **there is usually no need for special configuration on the CDN side**, but it's important to verify that the CDN is caching responses as expected (e.g. by checking response headers or using CDN analytics) to ensure optimal performance.
+
+**This should keep your origin servers from overloading and provide a fast experience for end users**, while still allowing you to serve optimized images on-the-fly without needing to pre-generate them.
+
+**If this model is not suitable for your use case, please enable the built-in cache** (see configuration options above) to improve performance when serving frequently requested transformations, but keep in mind that the in-memory cache is not shared across multiple instances of the service, so it may not be effective in a horizontally scaled deployment. You can optionally enable the disk cache if you are dealing with larger images or want to persist cached items across restarts, but this will require additional disk space and may have performance implications depending on the underlying storage. If you chose to use disk, it is recommended to use fast storage (e.g. SSD) and also enable the in-memory cache to reduce latency for frequently accessed items (default is 100 MB, which is usually enough for homepage images, which are typically the most frequently accessed).
+
+## Security considerations
+
+When deploying this service, it's important to ensure that the `IMAGE_PROXY_ROOT_PATH` is set to a directory that only contains images you intend to serve, and that the service is not exposed to untrusted users who could potentially request sensitive files or cause excessive resource usage by requesting large transformations. Additionally, if using the fallback image feature, make sure to set a reasonable `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` to prevent abuse. It's also recommended to run the service with limited permissions and in a secure environment (e.g. behind a reverse proxy with proper access controls) to mitigate potential security risks.
+
+`image-proxy` provides some protections against common issues like path traversal and it should refuse to serve files that are not valid images, but you should not rely solely on these protections and should ensure that the service is deployed in a secure manner to minimize potential risks.
+
+## Monitoring with Prometheus
+
+The built-in Prometheus metrics endpoint (`/metrics`) provides insights into the service's performance and usage. You can configure your Prometheus server to scrape this endpoint at regular intervals to collect metrics such as request counts, response times, cache hit/miss rates, and error rates. This information can be invaluable for monitoring the health of your deployment, identifying bottlenecks, and optimizing performance. Make sure to set up appropriate alerting based on these metrics to proactively address any issues that may arise.
+
+Keep a keen eye on the cache miss/hit ratio, as a high miss rate may indicate that the cache size is insufficient or that the workload has a large variety of transformations that are not being effectively cached. Adjusting cache settings or analyzing request patterns can significantly reduce load on the server and improve response times.
+
+## Running the project locally
 
 ### Docker Compose (recommended)
 
