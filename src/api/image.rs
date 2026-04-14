@@ -14,6 +14,16 @@ use tokio_util::io::ReaderStream;
 
 const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
 
+pub fn add_headers_for_caching(
+    response: &mut actix_web::HttpResponseBuilder,
+    config: &EncodingConfig,
+) {
+    response.insert_header(("Vary", "Sec-CH-DPR"));
+    if !config.cache_control_header.is_empty() {
+        response.insert_header(("Cache-Control", config.cache_control_header.clone()));
+    }
+}
+
 #[actix_web::get("/{filename:.*}")]
 #[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
 pub async fn process_image_request(
@@ -126,11 +136,11 @@ pub async fn process_image_request(
             request_count
                 .with_label_values(&[effective_format.as_str(), "ok"])
                 .inc();
-            return Ok(HttpResponse::Ok()
-                .content_type(content_type)
-                .insert_header(("X-Cache", "HIT"))
-                .insert_header(("Vary", "Sec-CH-DPR"))
-                .body(entry.value().clone()));
+            let mut builder = HttpResponse::Ok();
+            builder.content_type(content_type);
+            builder.insert_header(("X-Cache", "HIT"));
+            add_headers_for_caching(&mut builder, &config);
+            return Ok(builder.body(entry.value().clone()));
         }
     }
 
@@ -161,11 +171,11 @@ pub async fn process_image_request(
         let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
 
         request_count.with_label_values(&[ext.as_str(), "ok"]).inc();
-        return Ok(HttpResponse::Ok()
-            .content_type(content_type)
-            .insert_header(("Content-Length", size.to_string()))
-            .insert_header(("Vary", "Sec-CH-DPR"))
-            .streaming(stream));
+        let mut builder = HttpResponse::Ok();
+        builder.content_type(content_type);
+        builder.insert_header(("Content-Length", size.to_string()));
+        add_headers_for_caching(&mut builder, &config);
+        return Ok(builder.streaming(stream));
     }
 
     let image_bytes: Vec<u8>;
@@ -199,10 +209,10 @@ pub async fn process_image_request(
 
             if query_params.is_empty() {
                 // Return a streaming response for the fallback image if no transformations are requested
-                return Ok(HttpResponse::Ok()
-                    .content_type(upstream_response.content_type())
-                    .insert_header(("Vary", "Sec-CH-DPR"))
-                    .streaming(upstream_response));
+                let mut builder = HttpResponse::Ok();
+                builder.content_type(upstream_response.content_type());
+                add_headers_for_caching(&mut builder, &config);
+                return Ok(builder.streaming(upstream_response));
             }
 
             // Otherwise, attempt to load the fallback image and apply transformations to it
@@ -226,7 +236,7 @@ pub async fn process_image_request(
     }
 
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
-    let config = config.get_ref().clone();
+    let config_for_pipeline = config.get_ref().clone();
     let pipeline_duration = pipeline_duration.get_ref().clone();
     let effective_format_clone = effective_format.clone();
     let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
@@ -240,7 +250,7 @@ pub async fn process_image_request(
             image,
             size_param,
             &effective_format_clone,
-            &config,
+            &config_for_pipeline,
             resize_algorithm_param,
             Some(&pipeline_duration),
         )?;
@@ -260,9 +270,9 @@ pub async fn process_image_request(
     request_count
         .with_label_values(&[effective_format.as_str(), "ok"])
         .inc();
-    Ok(HttpResponse::Ok()
-        .content_type(content_type)
-        .insert_header(("X-Cache", "MISS"))
-        .insert_header(("Vary", "Sec-CH-DPR"))
-        .body(result_image_bytes))
+    let mut builder = HttpResponse::Ok();
+    builder.content_type(content_type);
+    builder.insert_header(("X-Cache", "MISS"));
+    add_headers_for_caching(&mut builder, &config);
+    Ok(builder.body(result_image_bytes))
 }

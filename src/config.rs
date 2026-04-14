@@ -42,6 +42,8 @@ pub struct EncodingConfig {
     pub cache_disk_path: String,
     /// Maximum size of items to store in memory (in bytes)
     pub cache_memory_max_item_size: usize,
+    /// Optional Cache-Control header value to set on responses (e.g., "public, max-age=31536000")
+    pub cache_control_header: String,
 }
 
 impl EncodingConfig {
@@ -105,6 +107,9 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(1 * 1024 * 1024), // Default to 1 MB
+            cache_control_header: std::env::var("IMAGE_PROXY_CACHE_CONTROL_HEADER")
+                .ok()
+                .unwrap_or("public, max-age=31536000, no-transform".to_string()), // Sane default for caching images for 1 year with no transformations allowed by downstream caches (Fastly, Cloudflare, etc.)
         }
     }
 }
@@ -129,6 +134,7 @@ impl Default for EncodingConfig {
             cache_disk_size: 512 * 1024 * 1024,
             cache_disk_path: "./cache".to_string(),
             cache_memory_max_item_size: 1024 * 1024,
+            cache_control_header: "public, max-age=31536000, no-transform".to_string(),
         }
     }
 }
