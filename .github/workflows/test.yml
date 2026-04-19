@@ -28,7 +28,7 @@ jobs:
         uses: dtolnay/rust-toolchain@1.92.0
 
       - name: Install dependencies
-        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libjxl
+        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libjxl-dev
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
