@@ -1,7 +1,8 @@
 use image::{DynamicImage, EncodableLayout, ImageEncoder, codecs::png::CompressionType};
+use jpegxl_rs::{ThreadsRunner, encode::EncoderResult, encoder_builder};
 use webp::WebPConfig;
 
-use crate::config::EncodingConfig;
+use crate::{config::EncodingConfig, utils::jxl_encoder_speed_from_int};
 
 #[tracing::instrument(level = "debug", skip_all, fields(format = ?format))]
 pub fn convert_image_format(
@@ -71,6 +72,17 @@ pub fn convert_image_format(
                 .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
 
             buffer.extend_from_slice(&webp_data);
+        }
+        Some("jxl") => {
+            let runner = ThreadsRunner::default();
+            let mut encoder = encoder_builder()
+                .speed(jxl_encoder_speed_from_int(config.jxl_speed))
+                .parallel_runner(&runner)
+                .quality(config.jxl_quality as f32 / 100.0) // Convert 0-100 to 0.0-1.0
+                .build()?;
+            let jxl_data: EncoderResult<u8> =
+                encoder.encode(&image.to_rgb8(), image.width(), image.height())?;
+            buffer.extend_from_slice(&jxl_data);
         }
         Some(other) => {
             anyhow::bail!("Unsupported format: {}", other);
@@ -201,5 +213,25 @@ mod tests {
         let bytes_high = convert_image_format(img, Some("webp"), &high_q).unwrap();
 
         assert!(bytes_high.len() > bytes_low.len());
+    }
+
+    #[test]
+    fn convert_to_jxl() {
+        let img = make_rgb_image(64, 64);
+        let config = test_config();
+        let bytes = convert_image_format(img, Some("jxl"), &config).unwrap();
+        // JPEG XL container starts with 0x000000_0C_4A584C20 or naked codestream with 0xFF0A
+        assert!(bytes.len() > 2);
+        let is_jxl_container = bytes.len() >= 12
+            && bytes[0] == 0x00
+            && bytes[1] == 0x00
+            && bytes[2] == 0x00
+            && bytes[3] == 0x0C;
+        let is_jxl_codestream = bytes[0] == 0xFF && bytes[1] == 0x0A;
+        assert!(
+            is_jxl_container || is_jxl_codestream,
+            "Expected JXL magic bytes, got: {:02X?}",
+            &bytes[..bytes.len().min(12)]
+        );
     }
 }

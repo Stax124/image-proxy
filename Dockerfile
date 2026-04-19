@@ -2,11 +2,11 @@
 # Chef stage (pre-built cargo-chef image)
 ################################################################################
 
-FROM lukemathwalker/cargo-chef:latest-rust-1.92.0-alpine AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.95.0-alpine AS chef
 WORKDIR /app
 
 # Install build dependencies needed to compile Rust crates on Alpine
-RUN apk add --no-cache clang lld git nasm dav1d-dev pkgconfig musl-dev
+RUN apk add --no-cache clang lld git nasm dav1d-dev pkgconfig musl-dev libjxl-dev
 
 # Disable static linking to avoid issues with libdav1d
 ENV RUSTFLAGS="-C target-feature=-crt-static"
@@ -49,7 +49,7 @@ FROM docker.io/library/alpine:3.23 AS runtime
 # Create a non-privileged user (recommended best practice)
 ARG UID=1000
 
-RUN apk add --no-cache libdav1d libgcc
+RUN apk add --no-cache libdav1d libgcc libjxl
 
 RUN adduser \
     --disabled-password \

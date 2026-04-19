@@ -12,7 +12,7 @@ use futures_util::TryStreamExt;
 use prometheus::{HistogramVec, IntCounterVec};
 use tokio_util::io::ReaderStream;
 
-const SUPPORTED_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
+const SUPPORTED_INPUT_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
 
 pub fn add_headers_for_caching(
     response: &mut actix_web::HttpResponseBuilder,
@@ -68,7 +68,7 @@ pub async fn process_image_request(
             .inc();
         return Ok(HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format"));
     };
-    if !SUPPORTED_FORMATS.contains(&ext.as_str()) {
+    if !SUPPORTED_INPUT_FORMATS.contains(&ext.as_str()) {
         request_count
             .with_label_values(&[ext.as_str(), "unsupported_media_type"])
             .inc();

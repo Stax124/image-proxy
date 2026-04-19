@@ -18,6 +18,11 @@ pub struct EncodingConfig {
     /// WebP effort level (0-6); higher is slower but better compression
     pub webp_effort: u8,
 
+    // JPEG XL encoding parameters
+    pub jxl_quality: u8,
+    /// JPEG XL encoding speed (0-10); higher is faster but worse compression
+    pub jxl_speed: u8,
+
     // Resizing parameters
     pub resize_algorithm: ResizeAlgorithm,
 
@@ -73,6 +78,14 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(4),
+            jxl_speed: std::env::var("IMAGE_PROXY_JXL_SPEED")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(7),
+            jxl_quality: std::env::var("IMAGE_PROXY_JXL_QUALITY")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(75),
             resize_algorithm: std::env::var("IMAGE_PROXY_RESIZE_ALGORITHM")
                 .ok()
                 .and_then(|s| ResizeAlgorithm::from_str(&s))
@@ -123,6 +136,8 @@ impl Default for EncodingConfig {
             avif_speed: 6,
             webp_quality: 80,
             webp_effort: 4,
+            jxl_speed: 7,
+            jxl_quality: 75,
             resize_algorithm: ResizeAlgorithm::Auto,
             root_path: "/tmp/test-images".to_string(),
             strip_path: None,
