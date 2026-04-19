@@ -5,7 +5,7 @@ A lightweight HTTP image-serving and transformation proxy written in Rust.
 ## Features
 
 - On-the-fly resize with preserved aspect ratio
-- Format conversion: **AVIF**, **JPEG**, **PNG**, **WebP**
+- Format conversion: **AVIF**, **JPEG**, **PNG**, **WebP**, **JPEG XL (output only)**
 - Fast pass-through when no transformation is requested (no decode/re-encode)
 - Hybrid in-memory and disk response cache (via [foyer](https://github.com/foyer-rs/foyer))
 - Prometheus metrics endpoint (`/metrics`)
@@ -22,7 +22,7 @@ Serves the image at `{IMAGE_PROXY_ROOT_PATH}/{filename}`.
 
 | Query Parameter    | Type     | Description                                                                                                                                                           |
 | ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `png`, `webp`                                                                                                                   |
+| `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `jxl`, `png`, `webp`                                                                                                            |
 | `size`             | `u32`    | Max bounding-box dimension in pixels (aspect ratio preserved)                                                                                                         |
 | `resize_algorithm` | `string` | Per-request resize algorithm override: `lanczos3`, `thumbnail`, or `auto`                                                                                             |
 | `dpr`              | `f64`    | Device pixel ratio (1.0–10.0). Multiplies `size` to produce the actual output dimension (useful for high-DPI displays where 1px in CSS can be multiple device pixels) |
@@ -38,6 +38,7 @@ GET /photos/sample.jpg               # serve original
 GET /photos/sample.jpg?size=400      # resize to fit 400×400 box (keeps the aspect ratio)
 GET /photos/sample.jpg?format=avif   # convert to AVIF
 GET /photos/sample.jpg?size=400&format=webp  # resize + convert to WebP
+GET /photos/sample.jpg?format=jxl            # convert to JPEG XL
 GET /photos/sample.jpg?size=400&resize_algorithm=lanczos3  # resize with Lanczos3
 GET /photos/sample.jpg?size=400&dpr=2          # resize to 800px (400 × 2.0)
 ```
@@ -69,6 +70,8 @@ All settings are provided via environment variables.
 | `IMAGE_PROXY_JPEG_QUALITY`            | `75`                                     | JPEG quality (0–100)                                                                                                                                      |
 | `IMAGE_PROXY_WEBP_QUALITY`            | `80`                                     | WebP quality (0–100)                                                                                                                                      |
 | `IMAGE_PROXY_WEBP_EFFORT`             | `4`                                      | WebP encoding effort (0–6, higher = slower/better compression)                                                                                            |
+| `IMAGE_PROXY_JXL_QUALITY`             | `75`                                     | JPEG XL quality (0–100)                                                                                                                                   |
+| `IMAGE_PROXY_JXL_SPEED`               | `6`                                      | JPEG XL encoder speed (1–10, higher = faster/lower quality)                                                                                               |
 | `IMAGE_PROXY_PNG_COMPRESSION_LEVEL`   | `6`                                      | PNG compression level (0–9, higher = smaller file/slower encoding)                                                                                        |
 | `IMAGE_PROXY_RESIZE_ALGORITHM`        | `auto`                                   | Resize algorithm to use: `lanczos3`, `thumbnail`, or `auto` (can be overridden by per-request query parameter)                                            |
 | `IMAGE_PROXY_ENABLE_CACHE`            | `false`                                  | Enable the response cache (only for transformed images)                                                                                                   |

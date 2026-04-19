@@ -10,6 +10,7 @@ awc = { version = "3.8", features = ["rustls"] }
 foyer = "0.22"
 futures-util = "0.3"
 image = { version = "*", features = ["nasm", "avif-native"] }
+jpegxl-rs = "0.14.0"
 mixtrics = { version = "0.2", features = ["prometheus"] }
 prometheus = "0.14"
 tokio = { version = "1.51", features = ["full"] }
