@@ -27,8 +27,15 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
 
+      - name: Update apt packages
+        run: sudo apt update
+
       - name: Install dependencies
-        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libjxl-dev
+        run: sudo apt install -y libdav1d7 libdav1d-dev nasm
+
+      - name: Install libjxl from local directory
+        run: |
+          sudo apt install -y ./data/libjxl/libjxl_0.11.1_amd64.deb ./data/libjxl/libjxl-dev_0.11.1_amd64.deb
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
