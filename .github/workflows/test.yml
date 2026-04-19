@@ -31,8 +31,7 @@ jobs:
         run: sudo apt update
 
       - name: Install dependencies
-        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libhwy-dev libbrotlienc
-          libbrotlidec
+        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libhwy-dev libbrotli-dev
 
       - name: Install libjxl from local directory
         run: |
