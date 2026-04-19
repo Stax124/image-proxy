@@ -31,7 +31,7 @@ jobs:
         run: sudo apt update
 
       - name: Install dependencies
-        run: sudo apt install -y libdav1d7 libdav1d-dev nasm
+        run: sudo apt install -y libdav1d7 libdav1d-dev nasm libhwy-dev
 
       - name: Install libjxl from local directory
         run: |
