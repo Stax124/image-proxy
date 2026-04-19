@@ -35,7 +35,10 @@ jobs:
 
       - name: Install libjxl from local directory
         run: |
-          sudo apt install -y ./data/libjxl/libjxl_0.11.1_amd64.deb ./data/libjxl/libjxl-dev_0.11.1_amd64.deb
+          cd ./data/libjxl/
+          sudo dpkg -i libjxl_0.11.1_amd64.deb libjxl-dev_0.11.1_amd64.deb
+          sudo ldconfig
+          pkg-config --cflags --libs libjxl
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
