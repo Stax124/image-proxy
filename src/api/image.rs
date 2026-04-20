@@ -1,10 +1,11 @@
-use std::path::Path;
 use std::sync::Arc;
 
 use crate::{
     config::EncodingConfig,
     operations::resize::ResizeAlgorithm,
-    utils::{load_bytes_from_disk, mime_type_for_format},
+    utils::{
+        PathValidationError, load_bytes_from_disk, mime_type_for_format, sanitize_and_validate_path,
+    },
 };
 use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use foyer::HybridCache;
@@ -36,46 +37,30 @@ pub async fn process_image_request(
     pipeline_duration: web::Data<HistogramVec>,
     request_count: web::Data<IntCounterVec>,
 ) -> actix_web::Result<HttpResponse> {
-    // Strip the specified path from the filename if configured
-    let filename = if let Some(strip_path) = &config.strip_path {
-        filename
-            .strip_prefix(strip_path)
-            .unwrap_or(&filename)
-            .to_string()
-    } else {
-        filename.to_string()
+    let (sanitized_path, sanitized_disk_path, ext) = match sanitize_and_validate_path(
+        &filename,
+        config.strip_path.as_deref(),
+        &config.root_path,
+        SUPPORTED_INPUT_FORMATS,
+    ) {
+        Ok(result) => result,
+        Err(PathValidationError::MissingExtension) => {
+            request_count
+                .with_label_values(&["unknown", "unsupported_media_type"])
+                .inc();
+            return Ok(
+                HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format")
+            );
+        }
+        Err(PathValidationError::UnsupportedFormat(ext)) => {
+            request_count
+                .with_label_values(&[ext.as_str(), "unsupported_media_type"])
+                .inc();
+            return Ok(HttpResponse::UnsupportedMediaType()
+                .body(format!("Unsupported file format: {}", ext)));
+        }
     };
-
-    // Sanitize the path to prevent directory traversal
-    let sanitized_path = Path::new(&filename)
-        .components()
-        .filter(|comp| matches!(comp, std::path::Component::Normal(_)))
-        .fold(Path::new("").to_path_buf(), |acc, comp| {
-            acc.join(comp.as_os_str())
-        });
-
-    // Join the sanitized path with the root path to get the final file path
-    let sanitized_disk_path = Path::new(&config.root_path).join(&sanitized_path);
-
-    // Check if the extension is valid and supported
-    let file_ext = sanitized_disk_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.to_lowercase());
-    let Some(ext) = &file_ext else {
-        request_count
-            .with_label_values(&["unknown", "unsupported_media_type"])
-            .inc();
-        return Ok(HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format"));
-    };
-    if !SUPPORTED_INPUT_FORMATS.contains(&ext.as_str()) {
-        request_count
-            .with_label_values(&[ext.as_str(), "unsupported_media_type"])
-            .inc();
-        return Ok(
-            HttpResponse::UnsupportedMediaType().body(format!("Unsupported file format: {}", ext))
-        );
-    }
+    let file_ext = Some(ext.clone());
 
     // Special headers that can influence processing
     let sec_ch_dpr = req
@@ -110,10 +95,22 @@ pub async fn process_image_request(
                 s
             }
         });
-
     let resize_algorithm_param = query_params
         .get("resize_algorithm")
         .and_then(|s| ResizeAlgorithm::from_str(s));
+
+    // If user requested an explicit output format, check if it's allowed by configuration, if not, reject the request early before doing any expensive work
+    if let Some(fmt) = format_param.as_ref()
+        && let Some(allowed_formats) = &config.allowed_output_formats
+    {
+        if !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt)) {
+            request_count
+                .with_label_values(&[fmt.as_str(), "unsupported_media_type"])
+                .inc();
+            return Ok(HttpResponse::UnsupportedMediaType()
+                .body(format!("Requested output format '{}' is not allowed", fmt)));
+        }
+    }
 
     // Use the explicitly requested format, or fall back to the original file's format
     let effective_format = format_param.or(file_ext.clone()).unwrap_or_default();

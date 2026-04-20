@@ -81,6 +81,7 @@ All settings are provided via environment variables.
 | `IMAGE_PROXY_CACHE_DISK_SIZE`         | `536870912` (512 MB)                     | Pre-allocated disk cache capacity in bytes                                                                                                                |
 | `IMAGE_PROXY_CACHE_DISK_PATH`         | `./cache`                                | Directory for the disk cache                                                                                                                              |
 | `IMAGE_PROXY_CACHE_CONTROL_HEADER`    | `public, max-age=31536000, no-transform` | Value for the `Cache-Control` response header; recommended for CDN use to enable long-term caching (set to empty string to disable)                       |
+| `IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS`  | *(unset – all formats allowed)*          | Comma-separated list of allowed output formats (e.g. `jpeg,png,webp`). When set, `?format=` requests for unlisted formats are rejected with 415           |
 | `RUST_LOG`                            | `INFO`                                   | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                                     |
 
 ## Production Deployment
