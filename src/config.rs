@@ -53,6 +53,8 @@ pub struct EncodingConfig {
     // Formats
     /// Optional list of allowed output formats (e.g., ["jpeg", "png", "avif", "webp", "jxl"]); if None, all formats are allowed
     pub allowed_output_formats: Option<Vec<String>>,
+    /// Allow automatic upgrade to better formats (e.g., WebP, AVIF, JPEG XL) when the client supports them and the source image is not already in that format; if None, no automatic format upgrading will be performed
+    pub preferred_formats: Option<Vec<String>>,
 }
 
 impl EncodingConfig {
@@ -130,6 +132,9 @@ impl EncodingConfig {
             allowed_output_formats: std::env::var("IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS")
                 .ok()
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect()),
+            preferred_formats: std::env::var("IMAGE_PROXY_PREFERRED_FORMATS")
+                .ok()
+                .map(|s| s.split(',').map(|s| s.trim().to_string()).collect()),
         }
     }
 }
@@ -158,6 +163,7 @@ impl Default for EncodingConfig {
             cache_memory_max_item_size: 1024 * 1024,
             cache_control_header: "public, max-age=31536000, no-transform".to_string(),
             allowed_output_formats: None,
+            preferred_formats: None,
         }
     }
 }

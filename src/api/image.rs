@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::{
     config::EncodingConfig,
     operations::resize::ResizeAlgorithm,
+    preferred_formats::get_preferred_format,
     utils::{
         PathValidationError, load_bytes_from_disk, mime_type_for_format, sanitize_and_validate_path,
     },
@@ -19,7 +20,7 @@ pub fn add_headers_for_caching(
     response: &mut actix_web::HttpResponseBuilder,
     config: &EncodingConfig,
 ) {
-    response.insert_header(("Vary", "Sec-CH-DPR"));
+    response.insert_header(("Vary", "Accept, Sec-CH-DPR"));
     if !config.cache_control_header.is_empty() {
         response.insert_header(("Cache-Control", config.cache_control_header.clone()));
     }
@@ -113,7 +114,16 @@ pub async fn process_image_request(
     }
 
     // Use the explicitly requested format, or fall back to the original file's format
-    let effective_format = format_param.or(file_ext.clone()).unwrap_or_default();
+    let effective_format = get_preferred_format(
+        &config,
+        format_param,
+        file_ext.as_deref().unwrap_or(""),
+        req.headers()
+            .get("Accept")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(""),
+        false,
+    );
     let content_type = mime_type_for_format(Some(effective_format.as_str()));
 
     // Build a cache key from the path and transformation parameters
@@ -142,7 +152,10 @@ pub async fn process_image_request(
     }
 
     // Stream local files directly when no transformation is requested.
-    if query_params.is_empty() && sanitized_disk_path.exists() {
+    if query_params.is_empty()
+        && sanitized_disk_path.exists()
+        && file_ext.as_deref() == Some(effective_format.as_str())
+    {
         let content_type = mime_type_for_format(file_ext.as_deref());
 
         let metadata = tokio::fs::metadata(&sanitized_disk_path)
@@ -188,7 +201,6 @@ pub async fn process_image_request(
 
             let mut upstream_response = http_client.get(&url).send().await.map_err(|e| {
                 tracing::debug!("Failed to fetch fallback image: {}", e);
-                // Reflect upstream fetch errors
                 actix_web::error::ErrorBadGateway("Failed to fetch fallback image")
             })?;
 
@@ -204,10 +216,20 @@ pub async fn process_image_request(
                 .into());
             }
 
-            if query_params.is_empty() {
+            let content_type = upstream_response.content_type();
+            let parsed_format = content_type
+                .split('/')
+                .nth(1)
+                .and_then(|s| s.split(';').next())
+                .map(|s| s.trim().to_lowercase())
+                .unwrap_or_else(|| "".to_string());
+
+            // If the upstream fallback image is in the same format as the requested format and no transformations
+            // are requested, we can directly stream it without loading it into memory
+            if query_params.is_empty() && parsed_format == effective_format {
                 // Return a streaming response for the fallback image if no transformations are requested
                 let mut builder = HttpResponse::Ok();
-                builder.content_type(upstream_response.content_type());
+                builder.content_type(content_type);
                 add_headers_for_caching(&mut builder, &config);
                 return Ok(builder.streaming(upstream_response));
             }
