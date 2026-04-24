@@ -28,6 +28,7 @@ export default function DefaultSearchDialog(props: SharedProps) {
     type: 'static',
     initOrama,
     locale,
+    from: '/image-proxy/api/search'
   });
 
   return (
