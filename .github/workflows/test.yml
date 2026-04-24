@@ -3,8 +3,18 @@ name: Rust Tests
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "data/libjxl/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
   pull_request:
     branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "data/libjxl/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
 
 permissions:
   contents: read
