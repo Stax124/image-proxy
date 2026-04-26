@@ -1,6 +1,13 @@
 import { Inter } from 'next/font/google';
+import type { Metadata } from 'next';
 import { Provider } from '@/components/provider';
 import './global.css';
+
+export const metadata: Metadata = {
+  icons: {
+    icon: '/image-proxy/icon.svg',
+  },
+};
 
 const inter = Inter({
   subsets: ['latin'],
