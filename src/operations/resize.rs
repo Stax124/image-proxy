@@ -7,7 +7,7 @@ pub enum ResizeAlgorithm {
     Lanczos3,
     /// Fast thumbnail (box/nearest) resampling.
     Thumbnail,
-    /// Choose automatically: use `Thumbnail` for large downscales (< 80 % of
+    /// Choose automatically: use `Thumbnail` for large downscales (< 50 % of
     /// the original longest edge), otherwise `Lanczos3`.
     Auto,
 }
@@ -45,10 +45,10 @@ pub fn resize_image(
     let size = max_height.max(max_width);
 
     let algorithm = if algorithm == ResizeAlgorithm::Auto {
-        // Use the fast thumbnail path when scaling to less than 80 % of the
+        // Use the fast thumbnail path when scaling to less than 50 % of the
         // original longest edge; prefer Lanczos3 for minor size reductions.
         let original_max = image.width().max(image.height()) as f64;
-        if (size as f64 / original_max) < 0.8 {
+        if (size as f64 / original_max) < 0.5 {
             ResizeAlgorithm::Thumbnail
         } else {
             ResizeAlgorithm::Lanczos3
