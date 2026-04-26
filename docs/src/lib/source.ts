@@ -31,7 +31,7 @@ export function getPageMarkdownUrl(page: (typeof source)['$inferPage']) {
 
   return {
     segments,
-    url: `${docsContentRoute}/${segments.join('/')}`,
+    url: `/image-proxy/${docsContentRoute}/${segments.join('/')}`,
   };
 }
 
