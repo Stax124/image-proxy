@@ -1,0 +1,21 @@
+---
+title: Security
+description: Security considerations for deploying image-proxy
+icon: Shield
+---
+
+## File Access
+
+Ensure that `IMAGE_PROXY_ROOT_PATH` points to a directory containing **only images you intend to serve**. The service should not be exposed to untrusted users who could request sensitive files or cause excessive resource usage through large transformations.
+
+image-proxy includes protections against common attacks like **path traversal** and will refuse to serve files that are not valid images. However, do not rely solely on these protections — deploy the service in a secure environment to minimize risk.
+
+## Fallback Image
+
+If using the fallback image feature (`IMAGE_PROXY_FALLBACK_IMAGE_URL`), set a reasonable `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` to prevent abuse. The default limit is 5 MB.
+
+## Deployment Recommendations
+
+- **Run with limited permissions** — Use a non-root user and restrict filesystem access to only the image directory.
+- **Place behind a reverse proxy** — Use Traefik, nginx, or Caddy with proper access controls, rate limiting, and TLS termination.
+- **Restrict network access** — If possible, limit which hosts can reach the service to your CDN or reverse proxy only.

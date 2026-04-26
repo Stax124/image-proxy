@@ -55,10 +55,4 @@ IMAGE_PROXY_STRIP_PATH=/images
 
 ### CDN
 
-For best performance, place a CDN ([Cloudflare](https://www.cloudflare.com), [Fastly](https://www.fastly.com), etc.) in front of image-proxy. The default `Cache-Control` header is set to cache for one year:
-
-```
-Cache-Control: public, max-age=31536000, no-transform
-```
-
-The `Vary: Accept, Sec-CH-DPR` header ensures CDNs cache separate variants per browser format support and device pixel ratio.
+See the dedicated [CDN](./cdn) page for detailed guidance on using a CDN with image-proxy.

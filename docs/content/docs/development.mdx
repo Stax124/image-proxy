@@ -1,0 +1,17 @@
+---
+title: Development
+description: How to develop and run image-proxy locally
+icon: Code
+---
+
+## Development
+
+Run the app locally with:
+
+```bash
+IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=DEBUG cargo run --release
+```
+
+- `IMAGE_PROXY_ROOT_PATH` — Must be overridden for development. Set it to any directory containing images for testing.
+- `RUST_LOG=DEBUG` — Enables detailed logs about request handling and transformations. Highly recommended when testing new features or troubleshooting.
+- `cargo run --release` — Release mode is important for realistic performance testing, especially for image transformations (debug mode is significantly slower, particularly for AVIF encoding).

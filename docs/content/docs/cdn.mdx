@@ -1,0 +1,44 @@
+---
+title: CDN
+description: Using a CDN with image-proxy for optimal performance
+icon: Database
+---
+
+**image-proxy should generally be used behind a CDN** like [Cloudflare](https://www.cloudflare.com) or [Fastly](https://www.fastly.com) that caches transformed images at the edge. This significantly improves performance and reduces load on the image-proxy service.
+
+## Why Use a CDN
+
+Placing a CDN in front of image-proxy keeps your origin servers from overloading while providing a fast experience for end users — without needing to pre-generate transformed images. The proxy handles on-the-fly transformations, and the CDN caches the results at the edge so each unique transformation is only computed once.
+
+## Cache-Control Header
+
+The default `Cache-Control` header enables long-term caching (1 year):
+
+```
+Cache-Control: public, max-age=31536000, no-transform
+```
+
+You can customize this via `IMAGE_PROXY_CACHE_CONTROL_HEADER`, or set it to an empty string to disable it entirely.
+
+## Vary Header
+
+The `Vary: Accept, Sec-CH-DPR` response header ensures CDNs cache separate variants per:
+
+- **Browser format support** — Different browsers support different image formats (e.g., AVIF, WebP). The `Accept` header signals which formats the browser can handle.
+- **Device pixel ratio** — The `Sec-CH-DPR` client hint allows serving appropriately sized images for different display densities.
+
+## CDN Configuration
+
+The CDN should cache responses based on the query parameters (`size`, `format`, `dpr`, etc.) to ensure different transformations are cached separately.
+
+Most CDNs handle image endpoint caching automatically, so **there is usually no need for special CDN-side configuration**. However, verify that responses are being cached as expected by:
+
+- Checking response headers (e.g., `CF-Cache-Status` for Cloudflare, `X-Cache` for Fastly)
+- Reviewing CDN analytics dashboards
+- Testing with `curl -I` to inspect cache headers
+
+## Without a CDN
+
+If a CDN is not suitable for your use case, enable the [built-in cache](/docs/caching) to improve performance for frequently requested transformations.
+
+Keep in mind that the in-memory cache is **not shared across multiple instances**, so it may not be effective in a horizontally scaled deployment. If using the disk cache, fast storage (e.g., SSD) is recommended, and you should also enable the in-memory cache to reduce latency for frequently accessed items.

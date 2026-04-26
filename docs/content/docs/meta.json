@@ -4,12 +4,15 @@
         "---Get Started---",
         "index",
         "installation",
+        "cdn",
         "---Usage---",
         "api",
         "formats",
         "configuration",
         "caching",
+        "security",
         "---Advanced---",
-        "metrics"
+        "metrics",
+        "development"
     ]
 }

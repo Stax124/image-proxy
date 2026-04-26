@@ -70,6 +70,12 @@ topk(1,
 )
 ```
 
+## Monitoring Recommendations
+
+Configure your Prometheus server to scrape the `/metrics` endpoint at regular intervals to collect request counts, response times, cache hit/miss rates, and error rates. Set up appropriate alerting based on these metrics to proactively address issues.
+
+Keep a keen eye on the **cache miss/hit ratio** — a high miss rate may indicate that the cache size is insufficient or that the workload has a large variety of transformations that are not being effectively cached. Adjusting cache settings or analyzing request patterns can significantly reduce server load and improve response times.
+
 ## Grafana Dashboard
 
 A basic dashboard can be built with these panels:
