@@ -1,0 +1,15 @@
+{
+    "title": "Documentation",
+    "pages": [
+        "---Get Started---",
+        "index",
+        "installation",
+        "---Usage---",
+        "api",
+        "formats",
+        "configuration",
+        "caching",
+        "---Advanced---",
+        "metrics"
+    ]
+}

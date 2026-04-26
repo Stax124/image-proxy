@@ -1,0 +1,64 @@
+---
+title: Installation
+description: How to install and deploy image-proxy
+icon: Download
+---
+
+## Docker (Recommended)
+
+First, take the `examples/docker-compose.yml` file and copy it anywhere you like. Then, run:
+
+```bash
+docker compose up
+```
+
+## Building from Source
+
+### Prerequisites
+
+- Rust 1.95.0+
+- clang, lld (for linking)
+- nasm (for AVIF native codec)
+- dav1d development libraries
+- libjxl development libraries
+- pkg-config
+
+### Build
+
+```bash
+cargo build --release
+```
+
+The binary will be at `target/release/image-proxy`.
+
+### Run
+
+```bash
+IMAGE_PROXY_ROOT_PATH=./data/images ./target/release/image-proxy
+```
+
+## Production Deployment
+
+### Reverse Proxy
+
+image-proxy should be placed behind a reverse proxy (e.g., Traefik, nginx, Caddy) for:
+
+- TLS termination
+- Rate limiting
+- Request routing
+
+If your reverse proxy adds a path prefix, use `IMAGE_PROXY_STRIP_PATH` to remove it:
+
+```bash
+IMAGE_PROXY_STRIP_PATH=/images
+```
+
+### CDN
+
+For best performance, place a CDN ([Cloudflare](https://www.cloudflare.com), [Fastly](https://www.fastly.com), etc.) in front of image-proxy. The default `Cache-Control` header is set to cache for one year:
+
+```
+Cache-Control: public, max-age=31536000, no-transform
+```
+
+The `Vary: Accept, Sec-CH-DPR` header ensures CDNs cache separate variants per browser format support and device pixel ratio.

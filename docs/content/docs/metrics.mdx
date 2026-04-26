@@ -1,0 +1,80 @@
+---
+title: Metrics
+description: Prometheus metrics for monitoring image-proxy
+icon: ChartLine
+---
+
+image-proxy exposes Prometheus metrics at the `/metrics` endpoint in text exposition format.
+
+## Endpoint
+
+```
+GET /metrics
+```
+
+**Response:**
+- Content-Type: `text/plain; version=0.0.4; charset=utf-8`
+
+## Available Metrics
+
+### `image_requests_total`
+
+**Type:** Counter
+
+Tracks the total number of image requests, labeled by output format and result status.
+
+| Label | Values |
+| --- | --- |
+| `format` | The output image format (e.g., `avif`, `webp`, `jpeg`, `png`, `jxl`) |
+| `status` | `ok`, `not_found`, `unsupported_media_type`, `error` |
+
+**Example queries:**
+
+```
+# Request rate by format
+rate(image_requests_total[5m])
+
+# Error rate
+sum(rate(image_requests_total{status!="ok"}[5m]))
+
+# Ratio of 404s to total requests
+sum(rate(image_requests_total{status="not_found"}[5m])) / sum(rate(image_requests_total[5m]))
+```
+
+### `image_pipeline_step_duration_seconds`
+
+**Type:** Histogram
+
+Tracks the duration of each step in the image processing pipeline.
+
+| Label | Values |
+| --- | --- |
+| `step` | `decode`, `resize`, `encode` |
+
+**Histogram buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
+
+**Example queries:**
+
+```
+# Average encode time
+rate(image_pipeline_step_duration_seconds_sum{step="encode"}[5m])
+  / rate(image_pipeline_step_duration_seconds_count{step="encode"}[5m])
+
+# 95th percentile resize time
+histogram_quantile(0.95, rate(image_pipeline_step_duration_seconds_bucket{step="resize"}[5m]))
+
+# Identify slowest pipeline step
+topk(1,
+  rate(image_pipeline_step_duration_seconds_sum[5m])
+    / rate(image_pipeline_step_duration_seconds_count[5m])
+)
+```
+
+## Grafana Dashboard
+
+A basic dashboard can be built with these panels:
+
+1. **Request Rate** — `rate(image_requests_total[5m])` grouped by `format`
+2. **Error Rate** — `rate(image_requests_total{status!="ok"}[5m])` grouped by `status`
+3. **Pipeline Latency** — `histogram_quantile(0.95, ...)` for each step (`decode`, `resize`, `encode`)
+4. **Format Distribution** — `sum by (format)(increase(image_requests_total[1h]))`

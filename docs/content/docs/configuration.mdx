@@ -1,0 +1,70 @@
+---
+title: Configuration
+description: Environment variables reference
+icon: Settings
+---
+
+All configuration is done through environment variables.
+
+## Server
+
+| Variable                   | Default        | Description                                                                                         |
+| -------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| `IMAGE_PROXY_BIND_ADDRESS` | `0.0.0.0:8000` | TCP address and port to listen on                                                                   |
+| `IMAGE_PROXY_ROOT_PATH`    | `/app/data`    | Root directory for serving image files                                                              |
+| `IMAGE_PROXY_STRIP_PATH`   | *(unset)*      | Path prefix to strip from incoming requests. Useful when behind a reverse proxy that adds a prefix. |
+| `RUST_LOG`                 | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                               |
+
+## Fallback
+
+| Variable                              | Default          | Description                                                                              |
+| ------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| `IMAGE_PROXY_FALLBACK_IMAGE_URL`      | *(unset)*        | Base URL for fetching images not found on disk (e.g., `https://cdn.example.com/images/`) |
+| `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` | `5242880` (5 MB) | Maximum size in bytes for fallback image responses. Prevents excessive memory usage.     |
+
+## Encoding
+
+See [Formats](/docs/formats) for details on each format's quality and speed parameters.
+
+| Variable                            | Default | Range | Description             |
+| ----------------------------------- | ------- | ----- | ----------------------- |
+| `IMAGE_PROXY_AVIF_QUALITY`          | `85`    | 0–100 | AVIF quality            |
+| `IMAGE_PROXY_AVIF_SPEED`            | `6`     | 1–10  | AVIF encoder speed      |
+| `IMAGE_PROXY_JPEG_QUALITY`          | `75`    | 0–100 | JPEG quality            |
+| `IMAGE_PROXY_WEBP_QUALITY`          | `80`    | 0–100 | WebP quality            |
+| `IMAGE_PROXY_WEBP_EFFORT`           | `4`     | 0–6   | WebP compression effort |
+| `IMAGE_PROXY_JXL_QUALITY`           | `75`    | 0–100 | JPEG XL quality         |
+| `IMAGE_PROXY_JXL_SPEED`             | `6`     | 1–10  | JPEG XL encoder speed   |
+| `IMAGE_PROXY_PNG_COMPRESSION_LEVEL` | `6`     | 0–9   | PNG compression level   |
+
+## Resize
+
+| Variable                       | Default | Options                         | Description                                              |
+| ------------------------------ | ------- | ------------------------------- | -------------------------------------------------------- |
+| `IMAGE_PROXY_RESIZE_ALGORITHM` | `auto`  | `auto`, `lanczos3`, `thumbnail` | Default resize algorithm. Can be overridden per-request. |
+
+## Format Selection
+
+| Variable                             | Default   | Description                                                                                                                                                                                                    |
+| ------------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMAGE_PROXY_PREFERRED_FORMATS`      | *(unset)* | Comma-separated list of preferred output formats for [automatic format selection](/docs/formats#automatic-format-selection) (e.g., `avif,webp`). Leaving this field empty disables automatic format selection. |
+| `IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS` | *(unset)* | Comma-separated list of allowed output formats. Requests for unlisted formats get `415`. When unset, all formats are allowed. Leaving this field empty allows all formats.                                     |
+
+## Caching
+
+See [Caching](/docs/caching) for detailed information.
+
+| Variable                          | Default              | Description                                                        |
+| --------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `IMAGE_PROXY_ENABLE_CACHE`        | `false`              | Enable response caching                                            |
+| `IMAGE_PROXY_CACHE_MEMORY_SIZE`   | `104857600` (100 MB) | In-memory cache capacity in bytes                                  |
+| `IMAGE_PROXY_CACHE_MAX_ITEM_SIZE` | `1048576` (1 MB)     | Maximum size of a single cached item. Larger items are not cached. |
+| `IMAGE_PROXY_ENABLE_DISK_CACHE`   | `false`              | Enable disk-backed cache (requires `ENABLE_CACHE=true`)            |
+| `IMAGE_PROXY_CACHE_DISK_SIZE`     | `536870912` (512 MB) | Pre-allocated disk cache capacity in bytes                         |
+| `IMAGE_PROXY_CACHE_DISK_PATH`     | `./cache`            | Directory for disk cache files                                     |
+
+## HTTP Headers
+
+| Variable                           | Default                                  | Description                                                                    |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `IMAGE_PROXY_CACHE_CONTROL_HEADER` | `public, max-age=31536000, no-transform` | Value for the `Cache-Control` response header. Set to empty string to disable. |

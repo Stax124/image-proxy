@@ -1,13 +1,45 @@
 ---
-title: Hello World
-description: Your first document
+title: Overview
+description: A lightweight HTTP image-serving and transformation proxy written in Rust
+icon: BookOpen
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+**image-proxy** is a high-performance image proxy that serves images from a local filesystem with on-the-fly transformations with optional fallback to remote images. It supports resizing, format conversion, hybrid caching, and Prometheus metrics.
 
-## What is Next?
+## Features
 
-<Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
-</Cards>
+- **On-the-fly transformations** — Resize and convert images on request, no pre-processing needed
+- **Automatic format selection** — Serve the best format based on browser `Accept` headers
+- **Hybrid caching** — In-memory + optional disk cache powered by [foyer](https://github.com/foyer-rs/foyer)
+- **Modern formats** — AVIF, WebP, JPEG XL (output), PNG, and JPEG support
+- **Device pixel ratio** — DPR-aware resizing via query parameter or `Sec-CH-DPR` client hint
+- **Fallback URL** — Fetch missing images from an upstream origin server
+- **Prometheus metrics** — Monitor request counts, error rates, and pipeline step durations
+- **Zero-cost passthrough** — Requests without transformations stream raw bytes directly, no decode/re-encode unless auto-formatting is enabled
+
+## Quick Start
+
+Copy the example `examples/docker-compose.yml` file anywhere you like and run:
+
+```bash
+docker compose up
+```
+
+Then request an image:
+
+```
+GET /photos/sample.jpg              # serve original
+GET /photos/sample.jpg?size=400     # resize to 400px bounding box
+GET /photos/sample.jpg?format=webp  # convert to WebP
+```
+
+## How It Works
+
+1. A request comes in for `/{filename}`
+2. The path is sanitized and validated against supported input formats
+3. If no transformation is requested, the raw file bytes are streamed directly
+4. If a transformation is requested (resize, format conversion), the image goes through the pipeline:
+   - **Decode** the source image
+   - **Resize** (if `size` parameter is set)
+   - **Encode** to the target format with configured quality settings
+5. The result is cached (if caching is enabled) and served with appropriate headers

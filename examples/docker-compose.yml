@@ -1,0 +1,12 @@
+services:
+  image-proxy:
+    # Replace the image with the one you want to use, preferably overwrite the tag `latest` with a specific
+    # version to avoid unexpected breaking changes, especially in production environments 
+    image: ghcr.io/stax124/image-proxy:latest
+    ports:
+      # Replace the first part with the port you want to use on your local machine
+      - "8000:8000"
+    volumes:
+      # Replace the first part with the path to your local images directory
+      - ./images:/app/data
+    # env: please see the configuration section in documentation for details on the available environment variables

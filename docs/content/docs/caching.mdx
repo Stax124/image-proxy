@@ -1,0 +1,53 @@
+---
+title: Caching
+description: In-memory and disk caching for transformed images
+icon: Database
+---
+
+image-proxy includes a hybrid cache powered by [foyer](https://github.com/foyer-rs/foyer) that stores transformed image responses in memory and optionally on disk.
+
+## When Caching Applies
+
+- **Requests without transformations** are streamed directly from disk and **not cached** — there's no benefit to caching raw file bytes.
+- **Requests with transformations** (resize, format conversion) go through the decode → resize → encode pipeline. The result is cached to avoid repeating expensive operations.
+
+The `X-Cache` response header indicates whether the response was served from cache:
+- `X-Cache: HIT` — Served from cache
+- `X-Cache: MISS` — Processed and (if eligible) stored in cache
+
+## Memory Cache
+
+Enable with:
+
+```bash
+IMAGE_PROXY_ENABLE_CACHE=true
+```
+
+| Variable                          | Default              | Description                          |
+| --------------------------------- | -------------------- | ------------------------------------ |
+| `IMAGE_PROXY_CACHE_MEMORY_SIZE`   | `104857600` (100 MB) | Total in-memory cache capacity       |
+| `IMAGE_PROXY_CACHE_MAX_ITEM_SIZE` | `1048576` (1 MB)     | Maximum size of a single cached item |
+
+Items larger than `CACHE_MAX_ITEM_SIZE` are not stored in the cache. The cache uses **LRU eviction** with an 80% high-priority pool ratio and weights entries by `key_size + value_size` in bytes.
+
+## Disk Cache
+
+For workloads with many unique transformations, enable the disk cache as an additional tier:
+
+```bash
+IMAGE_PROXY_ENABLE_CACHE=true
+IMAGE_PROXY_ENABLE_DISK_CACHE=true
+```
+
+| Variable                      | Default              | Description                       |
+| ----------------------------- | -------------------- | --------------------------------- |
+| `IMAGE_PROXY_CACHE_DISK_SIZE` | `536870912` (512 MB) | Pre-allocated disk cache capacity |
+| `IMAGE_PROXY_CACHE_DISK_PATH` | `./cache`            | Directory for disk cache files    |
+
+The disk cache uses block-based storage with pre-allocated capacity. It persists across restarts and works best on SSD storage.
+
+## Sizing Guidelines
+
+- **Memory cache**: Size based on your most frequently requested image variants. A 100 MB cache typically holds hundreds or even thousands of resized/converted images.
+- **Max item size**: Set higher if you serve large images that benefit from caching. The default 1 MB filter prevents a few large items from evicting many smaller ones (better cache 1000 smaller items that are requested quite often than one 4k image).
+- **Disk cache**: Useful when the working set of transformed images exceeds available memory. Pre-allocate enough space for your expected traffic patterns.

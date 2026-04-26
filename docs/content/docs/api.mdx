@@ -1,0 +1,93 @@
+---
+title: API Reference
+description: HTTP endpoints and request parameters
+icon: Route
+---
+
+## Image Endpoint
+
+```
+GET /{filename}
+```
+
+Serves an image from the configured root path, optionally applying transformations. The `filename` supports nested paths (e.g., `photos/2024/sample.jpg`).
+
+### Query Parameters
+
+| Parameter          | Type     | Description                                                                          |
+| ------------------ | -------- | ------------------------------------------------------------------------------------ |
+| `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `jxl`, `png`, `webp`                           |
+| `size`             | `u32`    | Maximum bounding-box dimension in pixels. Maintains aspect ratio. Does not upscale.  |
+| `dpr`              | `f64`    | Device pixel ratio (1.0–10.0). Multiplies `size` to produce actual output dimension. |
+| `resize_algorithm` | `string` | Resize algorithm override: `lanczos3`, `thumbnail`, `auto`                           |
+
+### Request Headers
+
+| Header       | Description                                                                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Accept`     | Browser format preferences. Used for [automatic format selection](/docs/formats#automatic-format-selection) when no `format` parameter is set. |
+| `Sec-CH-DPR` | Client hint for device pixel ratio. Overridden by the `dpr` query parameter if both are present.                                               |
+
+### Response Headers
+
+| Header          | Value                                                   |
+| --------------- | ------------------------------------------------------- |
+| `Content-Type`  | `image/{format}` matching the output format             |
+| `Cache-Control` | `public, max-age=31536000, no-transform` (customizable) |
+| `Vary`          | `Accept, Sec-CH-DPR`                                    |
+| `X-Cache`       | `HIT` or `MISS` (when caching is enabled)               |
+
+### Status Codes
+
+| Code  | Meaning                                                   |
+| ----- | --------------------------------------------------------- |
+| `200` | Image served successfully                                 |
+| `404` | File not found (and no fallback URL configured)           |
+| `415` | Unsupported input/output format or missing file extension |
+| `502` | Fallback image fetch failed                               |
+| `500` | Internal processing error                                 |
+
+### Examples
+
+```bash
+# Serve original file (no transformation, raw bytes streamed)
+curl http://localhost:8000/photo.jpg
+
+# Convert to WebP
+curl http://localhost:8000/photo.jpg?format=webp
+
+# Resize to fit within 400x400 bounding box
+curl http://localhost:8000/photo.jpg?size=400
+
+# Resize + convert + 2x DPR (actual output: 800px)
+curl http://localhost:8000/photo.jpg?size=400&format=avif&dpr=2
+
+# Override resize algorithm
+curl http://localhost:8000/photo.jpg?size=400&resize_algorithm=lanczos3
+
+# Use Sec-CH-DPR header instead of query param
+curl -H "Sec-CH-DPR: 2.0" http://localhost:8000/photo.jpg?size=400
+```
+
+### Behavior
+
+- **No transformation parameters** — The raw file is streamed directly without decoding or re-encoding.
+- **With transformations** — The image is decoded, processed through the pipeline (resize → encode), and the result is cached if caching is enabled.
+- **File not found + fallback URL** — The image is fetched from the configured `IMAGE_PROXY_FALLBACK_IMAGE_URL`, transformed, and served. The response size is capped by `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE`.
+- **File not found + no fallback** — Returns `404 Not Found`.
+
+---
+
+## Metrics Endpoint
+
+```
+GET /metrics
+```
+
+Returns Prometheus metrics in text exposition format.
+
+**Response:**
+- Status: `200 OK`
+- Content-Type: `text/plain; version=0.0.4; charset=utf-8`
+
+See [Metrics](/docs/metrics) for details on available metrics.

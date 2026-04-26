@@ -1,0 +1,125 @@
+---
+title: Formats
+description: Supported image formats, quality settings, and automatic format selection
+icon: Image
+---
+
+## Supported Formats
+
+| Format        | Input | Output | Notes                                   |
+| ------------- | :---: | :----: | --------------------------------------- |
+| AVIF          |   ✓   |   ✓    | Native codec via image crate with dav1d |
+| JPEG / JPG    |   ✓   |   ✓    | —                                       |
+| PNG           |   ✓   |   ✓    | Lossless                                |
+| WebP          |   ✓   |   ✓    | —                                       |
+| JPEG XL (JXL) |   ✗   |   ✓    | Output only; requires libjxl            |
+
+## Quality & Encoding Settings
+
+### AVIF
+
+| Variable                   | Default | Range | Description                                    |
+| -------------------------- | ------- | ----- | ---------------------------------------------- |
+| `IMAGE_PROXY_AVIF_QUALITY` | `85`    | 0–100 | Encoding quality                               |
+| `IMAGE_PROXY_AVIF_SPEED`   | `6`     | 1–10  | Encoder speed (higher = faster, lower quality) |
+
+### JPEG
+
+| Variable                   | Default | Range | Description      |
+| -------------------------- | ------- | ----- | ---------------- |
+| `IMAGE_PROXY_JPEG_QUALITY` | `75`    | 0–100 | Encoding quality |
+
+### PNG
+
+| Variable                            | Default | Range | Description                                       |
+| ----------------------------------- | ------- | ----- | ------------------------------------------------- |
+| `IMAGE_PROXY_PNG_COMPRESSION_LEVEL` | `6`     | 0–9   | Compression level (higher = smaller file, slower) |
+
+### WebP
+
+| Variable                   | Default | Range | Description                                              |
+| -------------------------- | ------- | ----- | -------------------------------------------------------- |
+| `IMAGE_PROXY_WEBP_QUALITY` | `80`    | 0–100 | Encoding quality                                         |
+| `IMAGE_PROXY_WEBP_EFFORT`  | `4`     | 0–6   | Compression effort (higher = slower, better compression) |
+
+### JPEG XL
+
+| Variable                  | Default | Range | Description                     |
+| ------------------------- | ------- | ----- | ------------------------------- |
+| `IMAGE_PROXY_JXL_QUALITY` | `75`    | 0–100 | Encoding quality                |
+| `IMAGE_PROXY_JXL_SPEED`   | `6`     | 1–10  | Encoder speed (higher = faster) |
+
+The JXL speed values map to named encoder presets:
+
+| Speed | Preset    |
+| ----- | --------- |
+| 1     | Lightning |
+| 2     | Thunder   |
+| 3     | Falcon    |
+| 4     | Cheetah   |
+| 5     | Hare      |
+| 6     | Wombat    |
+| 7     | Squirrel  |
+| 8     | Kitten    |
+| 9     | Tortoise  |
+| 10    | Glacier   |
+
+---
+
+## Automatic Format Selection
+
+When no `format` query parameter is provided, image-proxy can automatically select the best output format based on the browser's `Accept` header and the configured preferred formats.
+
+This feature is optional and opt-in via the `IMAGE_PROXY_PREFERRED_FORMATS` environment variable. If unset, the original file format is always preserved and returned directly as bytes without re-encoding.
+
+### How It Works
+
+1. If the request includes an explicit `format` parameter, that format is used (subject to `allowed_output_formats`)
+2. Otherwise, the browser's `Accept` header is parsed for supported image formats
+3. The first format in the `IMAGE_PROXY_PREFERRED_FORMATS` list that the browser supports is selected
+4. If the source image has an **alpha channel**, formats that support transparency (`jxl`, `webp`) are prioritized
+5. If no match is found, the original file format is preserved
+
+### Configuration
+
+```bash
+# Prefer AVIF, then WebP, for browsers that support them
+IMAGE_PROXY_PREFERRED_FORMATS=avif,webp
+```
+
+### Example
+
+A browser sends:
+
+```
+Accept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8
+```
+
+With `IMAGE_PROXY_PREFERRED_FORMATS=avif,webp`, the proxy will serve the image as AVIF since the browser supports it and it's first in the preferred list.
+
+---
+
+## Restricting Output Formats
+
+This may be desirable to prevent serving formats that are expensive to encode (AVIF), as it may pressure the server under load.
+Use `IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS` to restrict which formats can be requested:
+
+```bash
+IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS=jpeg,png,webp
+```
+
+Requests for formats not in this list will receive a `415 Unsupported Media Type` response. When unset, all output formats are allowed.
+
+---
+
+## Resize Algorithms
+
+Three resize algorithms are available, configurable globally via `IMAGE_PROXY_RESIZE_ALGORITHM` or per-request via the `resize_algorithm` query parameter:
+
+| Algorithm   | Description                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`      | Automatically selects the best algorithm based on the scale factor. Uses `thumbnail` for scales below 50% of the original longest edge, `lanczos3` otherwise. **(default)** |
+| `lanczos3`  | High-quality Lanczos resampling. Best for moderate size reductions.                                                                                                         |
+| `thumbnail` | Fast box/nearest-neighbor resampling. Best for large downscales.                                                                                                            |
+
+Resizing maintains aspect ratio using a bounding-box constraint and **never upscales** beyond the original dimensions.
