@@ -32,7 +32,7 @@ pub fn build_app_data(
 ) -> (
     web::Data<Arc<EncodingConfig>>,
     web::Data<awc::Client>,
-    web::Data<Option<foyer::HybridCache<String, Vec<u8>>>>,
+    web::Data<Option<foyer::HybridCache<String, bytes::Bytes>>>,
     web::Data<prometheus::Registry>,
     web::Data<prometheus::HistogramVec>,
     web::Data<prometheus::IntCounterVec>,

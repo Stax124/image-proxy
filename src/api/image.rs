@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
+use bytes::Bytes;
 use foyer::HybridCache;
 use futures_util::TryStreamExt;
 use prometheus::{HistogramVec, IntCounterVec};
@@ -34,7 +35,7 @@ pub async fn process_image_request(
     query_params: web::Query<std::collections::HashMap<String, String>>,
     config: web::Data<Arc<EncodingConfig>>,
     http_client: web::Data<awc::Client>,
-    cache: web::Data<Option<HybridCache<String, Vec<u8>>>>,
+    cache: web::Data<Option<HybridCache<String, Bytes>>>,
     pipeline_duration: web::Data<HistogramVec>,
     request_count: web::Data<IntCounterVec>,
 ) -> actix_web::Result<HttpResponse> {
@@ -188,7 +189,7 @@ pub async fn process_image_request(
         return Ok(builder.streaming(stream));
     }
 
-    let image_bytes: Vec<u8>;
+    let image_bytes: Bytes;
     if !sanitized_disk_path.exists() {
         // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some()
@@ -235,11 +236,10 @@ pub async fn process_image_request(
             }
 
             // Otherwise, attempt to load the fallback image and apply transformations to it
-            let fallback_image_body = upstream_response
+            image_bytes = upstream_response
                 .body()
                 .limit(config.fallback_image_max_size)
                 .await?;
-            image_bytes = fallback_image_body.to_vec();
         } else {
             request_count
                 .with_label_values(&[ext.as_str(), "not_found"])
@@ -251,7 +251,8 @@ pub async fn process_image_request(
         let path = sanitized_disk_path.clone();
         image_bytes = load_bytes_from_disk(&path)
             .await
-            .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?;
+            .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?
+            .into();
     }
 
     // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
@@ -282,6 +283,7 @@ pub async fn process_image_request(
     })?;
 
     // Store the transformed result in cache
+    let result_image_bytes = Bytes::from(result_image_bytes);
     if let Some(cache) = cache.get_ref() {
         cache.insert(cache_key, result_image_bytes.clone());
     }

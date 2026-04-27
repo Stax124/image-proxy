@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use foyer::{
     BlockEngineConfig, DeviceBuilder, EvictionConfig, FsDeviceBuilder, HybridCacheBuilder,
     LruConfig, PsyncIoEngineConfig,
@@ -7,7 +8,7 @@ use mixtrics::registry::prometheus::PrometheusMetricsRegistry;
 pub async fn setup_cache(
     config: &crate::config::EncodingConfig,
     prometheus_registry: &prometheus::Registry,
-) -> anyhow::Result<Option<foyer::HybridCache<String, Vec<u8>>>> {
+) -> anyhow::Result<Option<foyer::HybridCache<String, Bytes>>> {
     if !config.enable_cache {
         return Ok(None);
     }
@@ -26,8 +27,8 @@ pub async fn setup_cache(
             .with_eviction_config(EvictionConfig::Lru(LruConfig {
                 high_priority_pool_ratio: 0.8,
             }))
-            .with_weighter(|key: &String, value: &Vec<u8>| key.len() + value.len())
-            .with_filter(move |_, value: &Vec<u8>| value.len() <= cache_memory_max_item_size)
+            .with_weighter(|key: &String, value: &Bytes| key.len() + value.len())
+            .with_filter(move |_, value: &Bytes| value.len() <= cache_memory_max_item_size)
             .storage()
             .with_io_engine_config(PsyncIoEngineConfig::default())
             .with_engine_config(BlockEngineConfig::new(dev))
@@ -45,8 +46,8 @@ pub async fn setup_cache(
             .with_eviction_config(EvictionConfig::Lru(LruConfig {
                 high_priority_pool_ratio: 0.8,
             }))
-            .with_weighter(|key: &String, value: &Vec<u8>| key.len() + value.len())
-            .with_filter(move |_, value: &Vec<u8>| value.len() <= cache_memory_max_item_size)
+            .with_weighter(|key: &String, value: &Bytes| key.len() + value.len())
+            .with_filter(move |_, value: &Bytes| value.len() <= cache_memory_max_item_size)
             .storage()
             .build()
             .await?;
