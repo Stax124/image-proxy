@@ -51,7 +51,7 @@ const features = [
 ];
 
 const dockerCommand =
-  'docker run -p 8000:8000 -v /path/to/images:/data stax124/image-proxy';
+  'docker run -p 8000:8000 -v /path/to/images:/app/data stax124/image-proxy';
 
 export default function HomePage() {
   return (
