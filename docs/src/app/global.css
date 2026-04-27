@@ -6,7 +6,25 @@ html {
   scrollbar-gutter: stable;
 }
 
-html > body[data-scroll-locked] {
+html.light #nd-home-layout {
+  background: #ffffff;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.2) 1.5px, transparent 1.5px);
+  background-size: 30px 30px;
+  background-position: 0 0;
+}
+
+html.dark #nd-home-layout {
+  background: #000000;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 1.5px, transparent 1.5px);
+  background-size: 30px 30px;
+  background-position: 0 0;
+}
+
+#nd-nav div {
+  background-color: transparent;
+}
+
+html>body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }

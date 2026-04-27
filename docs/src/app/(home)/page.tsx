@@ -99,7 +99,7 @@ export default function HomePage() {
       </div>
 
       {/* Docker Command */}
-      <div className="mt-10 flex w-full max-w-xl items-center rounded-xl border border-fd-border bg-fd-card px-4 py-3">
+      <div className="mt-10 flex w-full max-w-xl items-center rounded-xl border border-fd-border bg-fd-background/65 px-4 py-3">
         <code className="flex-1 text-sm text-fd-muted-foreground overflow-x-auto">
           <span className="text-blue-400 select-none mr-2">$</span>{dockerCommand}
         </code>
@@ -114,7 +114,7 @@ export default function HomePage() {
         {features.map((feature) => (
           <div
             key={feature.title}
-            className="rounded-xl border border-fd-border bg-fd-card p-6"
+            className="rounded-xl bg-fd-background/65 border border-fd-border p-6"
           >
             <div className="mb-4 inline-flex rounded-lg border border-fd-border bg-fd-background p-3">
               {feature.icon}
