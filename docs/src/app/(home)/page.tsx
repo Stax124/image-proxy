@@ -51,7 +51,7 @@ const features = [
 ];
 
 const dockerCommand =
-  'docker run -p 8000:8000 -v /path/to/images:/app/data stax124/image-proxy';
+  'docker run -p 8000:8000 -v /path/to/images:/app/data ghcr.io/stax124/image-proxy:latest';
 
 export default function HomePage() {
   return (
@@ -100,8 +100,9 @@ export default function HomePage() {
 
       {/* Docker Command */}
       <div className="mt-10 flex w-full max-w-xl items-center rounded-xl border border-fd-border bg-fd-background/65 px-4 py-3">
-        <code className="flex-1 text-sm text-fd-muted-foreground overflow-x-auto">
-          <span className="text-blue-400 select-none mr-2">$</span>{dockerCommand}
+        <code className="flex-1 text-sm text-fd-muted-foreground overflow-x-auto flex flex-row gap-3">
+          <span className="text-blue-400 select-none">$</span>
+          <code>{dockerCommand}</code>
         </code>
         <CopyButton text={dockerCommand} />
       </div>
