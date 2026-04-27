@@ -2,10 +2,6 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-html {
-  scrollbar-gutter: stable;
-}
-
 html.light #nd-home-layout {
   background: #ffffff;
   background-image: radial-gradient(circle, rgba(0, 0, 0, 0.2) 1.5px, transparent 1.5px);
