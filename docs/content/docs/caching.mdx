@@ -11,9 +11,11 @@ image-proxy includes a hybrid cache powered by [foyer](https://github.com/foyer-
 - **Requests without transformations** are streamed directly from disk and **not cached** — there's no benefit to caching raw file bytes.
 - **Requests with transformations** (resize, format conversion) go through the decode → resize → encode pipeline. The result is cached to avoid repeating expensive operations.
 
-The `X-Cache` response header indicates whether the response was served from cache:
-- `X-Cache: HIT` — Served from cache
-- `X-Cache: MISS` — Processed and (if eligible) stored in cache
+The `X-Image-Proxy-Cache` response header indicates whether the response was served from cache:
+- `X-Image-Proxy-Cache: HIT` — Served from cache
+- `X-Image-Proxy-Cache: MISS` — Processed and (if eligible) stored in cache
+
+You can customize the header name via `IMAGE_PROXY_CACHE_STATUS_HEADER` (e.g. set to `X-Cache` if preferred).
 
 ## Memory Cache
 

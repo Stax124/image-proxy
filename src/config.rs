@@ -49,6 +49,8 @@ pub struct EncodingConfig {
     pub cache_memory_max_item_size: usize,
     /// Optional Cache-Control header value to set on responses (e.g., "public, max-age=31536000")
     pub cache_control_header: String,
+    /// Optional header name override for cache hits (e.g., "HIT", "MISS"); if None, no X-Image-Proxy-Cache header will be set
+    pub cache_status_header: String,
 
     // Formats
     /// Optional list of allowed output formats (e.g., ["jpeg", "png", "avif", "webp", "jxl"]); if None, all formats are allowed
@@ -129,6 +131,8 @@ impl EncodingConfig {
             cache_control_header: std::env::var("IMAGE_PROXY_CACHE_CONTROL_HEADER")
                 .ok()
                 .unwrap_or("public, max-age=31536000, no-transform".to_string()), // Sane default for caching images for 1 year with no transformations allowed by downstream caches (Fastly, Cloudflare, etc.)
+            cache_status_header: std::env::var("IMAGE_PROXY_CACHE_STATUS_HEADER")
+                .unwrap_or_else(|_| "X-Image-Proxy-Cache".to_string()),
             allowed_output_formats: std::env::var("IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS")
                 .ok()
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect()),
@@ -155,6 +159,7 @@ impl Default for EncodingConfig {
             strip_path: None,
             fallback_image_url: None,
             fallback_image_max_size: 5 * 1024 * 1024,
+            cache_status_header: "X-Cache".to_string(),
             enable_cache: false,
             cache_memory_size: 100 * 1024 * 1024,
             enable_disk_cache: false,

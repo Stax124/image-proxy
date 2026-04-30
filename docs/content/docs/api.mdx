@@ -30,12 +30,12 @@ Serves an image from the configured root path, optionally applying transformatio
 
 ### Response Headers
 
-| Header          | Value                                                   |
-| --------------- | ------------------------------------------------------- |
-| `Content-Type`  | `image/{format}` matching the output format             |
-| `Cache-Control` | `public, max-age=31536000, no-transform` (customizable) |
-| `Vary`          | `Accept, Sec-CH-DPR`                                    |
-| `X-Cache`       | `HIT` or `MISS` (when caching is enabled)               |
+| Header                | Value                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Content-Type`        | `image/{format}` matching the output format                                                               |
+| `Cache-Control`       | `public, max-age=31536000, no-transform` (customizable)                                                   |
+| `Vary`                | `Accept, Sec-CH-DPR`                                                                                      |
+| `X-Image-Proxy-Cache` | `HIT` or `MISS` (when caching is enabled; header name configurable via `IMAGE_PROXY_CACHE_STATUS_HEADER`) |
 
 ### Status Codes
 

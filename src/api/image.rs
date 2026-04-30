@@ -146,7 +146,7 @@ pub async fn process_image_request(
                 .inc();
             let mut builder = HttpResponse::Ok();
             builder.content_type(content_type);
-            builder.insert_header(("X-Cache", "HIT"));
+            builder.insert_header((config.cache_status_header.clone(), "HIT"));
             add_headers_for_caching(&mut builder, &config);
             return Ok(builder.body(entry.value().clone()));
         }
@@ -293,7 +293,7 @@ pub async fn process_image_request(
         .inc();
     let mut builder = HttpResponse::Ok();
     builder.content_type(content_type);
-    builder.insert_header(("X-Cache", "MISS"));
+    builder.insert_header((config.cache_status_header.clone(), "MISS"));
     add_headers_for_caching(&mut builder, &config);
     Ok(builder.body(result_image_bytes))
 }
