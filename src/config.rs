@@ -159,7 +159,7 @@ impl Default for EncodingConfig {
             strip_path: None,
             fallback_image_url: None,
             fallback_image_max_size: 5 * 1024 * 1024,
-            cache_status_header: "X-Cache".to_string(),
+            cache_status_header: "X-Image-Proxy-Cache".to_string(),
             enable_cache: false,
             cache_memory_size: 100 * 1024 * 1024,
             enable_disk_cache: false,
