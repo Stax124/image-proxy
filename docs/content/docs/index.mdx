@@ -8,38 +8,30 @@ icon: BookOpen
 
 ## Features
 
-- **On-the-fly transformations** — Resize and convert images on request, no pre-processing needed
-- **Automatic format selection** — Serve the best format based on browser `Accept` headers
-- **Hybrid caching** — In-memory + optional disk cache powered by [foyer](https://github.com/foyer-rs/foyer)
-- **Modern formats** — AVIF, WebP, JPEG XL (output), PNG, and JPEG support
-- **Device pixel ratio** — DPR-aware resizing via query parameter or `Sec-CH-DPR` client hint
-- **Fallback URL** — Fetch missing images from an upstream origin server
-- **Prometheus metrics** — Monitor request counts, error rates, and pipeline step durations
-- **Zero-cost passthrough** — Requests without transformations stream raw bytes directly, no decode/re-encode unless auto-formatting is enabled
+- **On-the-fly resize with preserved aspect ratio**
+- **Format conversion:** AVIF, JPEG, PNG, WebP, JPEG XL (output only)
+- **Fast pass-through** when no transformation is requested (no decode/re-encode)
+- **Hybrid in-memory and disk response cache** (via [foyer](https://github.com/foyer-rs/foyer))
+- **Prometheus metrics endpoint** (`/metrics`)
+- **Fallback image URL support** (fetch from upstream when a file is not found locally)
+- **Configurable via environment variables**
+- **Automatic `Vary: Sec-CH-DPR` header** for proper CDN caching with device pixel ratio
+- **Configurable `Cache-Control` header** for optimal CDN and browser caching
 
-## Quick Start
+## Usage
 
-Copy the example `examples/docker-compose.yml` file anywhere you like and run:
-
-```bash
-docker compose up
+```sh
+docker run -p 8000:8000 -v /path/to/images:/app/data ghcr.io/stax124/image-proxy:latest
 ```
 
-Then request an image:
-
 ```
-GET /photos/sample.jpg              # serve original
-GET /photos/sample.jpg?size=400     # resize to 400px bounding box
-GET /photos/sample.jpg?format=webp  # convert to WebP
+GET /photos/sample.jpg               # serve original
+GET /photos/sample.jpg?size=400      # resize to fit 400×400 box (keeps the aspect ratio)
+GET /photos/sample.jpg?format=avif   # convert to AVIF
+GET /photos/sample.jpg?size=400&format=webp  # resize + convert to WebP
+GET /photos/sample.jpg?format=jxl            # convert to JPEG XL
+GET /photos/sample.jpg?size=400&resize_algorithm=lanczos3  # resize with Lanczos3
+GET /photos/sample.jpg?size=400&dpr=2          # resize to 800px (400 × 2.0)
 ```
 
-## How It Works
-
-1. A request comes in for `/{filename}`
-2. The path is sanitized and validated against supported input formats
-3. If no transformation is requested, the raw file bytes are streamed directly
-4. If a transformation is requested (resize, format conversion), the image goes through the pipeline:
-   - **Decode** the source image
-   - **Resize** (if `size` parameter is set)
-   - **Encode** to the target format with configured quality settings
-5. The result is cached (if caching is enabled) and served with appropriate headers
+For more configuration options and installation methods, please refer to the [documentation](https://stax124.github.io/image-proxy/).
