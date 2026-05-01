@@ -30,7 +30,7 @@ codegen-units = 1
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "thin"
 
 [patch.crates-io]
 image = { path = "./image", version = "0.25.8" }
