@@ -17,7 +17,10 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 ################################################################################
 
 FROM chef AS planner
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY image/Cargo.toml image/Cargo.toml
+COPY src/ src/
+COPY image/src/ image/src/
 RUN cargo chef prepare --recipe-path recipe.json
 
 ################################################################################
@@ -35,7 +38,9 @@ COPY image/ image/
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build application
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY src/ src/
+COPY tests/ tests/
 RUN cargo build --locked --release && \
     cp ./target/release/image-proxy /bin/image-proxy
 
