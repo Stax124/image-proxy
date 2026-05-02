@@ -1,6 +1,6 @@
 use image::{DynamicImage, EncodableLayout, ImageEncoder, codecs::png::CompressionType};
 use jpegxl_rs::{ThreadsRunner, encode::EncoderResult, encoder_builder};
-use webp::WebPConfig;
+use webp::{WebPConfig, WebPMemory};
 
 use crate::{config::EncodingConfig, utils::jxl_encoder_speed_from_int};
 
@@ -55,33 +55,54 @@ pub fn convert_image_format(
             )?
         }
         Some("webp") => {
-            // Convert to RGBA once upfront; avoids the re-conversion inside from_image()
-            let rgba = image.into_rgba8();
-            let (w, h) = (rgba.width(), rgba.height());
-            let encoder = webp::Encoder::from_rgba(rgba.as_raw(), w, h);
-
+            let has_alpha = image.color().has_alpha();
             let mut webp_config = WebPConfig::new()
                 .map_err(|e| anyhow::anyhow!("Failed to create WebPConfig: {:?}", e))?;
             webp_config.lossless = 0;
             webp_config.alpha_compression = 1;
             webp_config.quality = config.webp_quality as f32;
             webp_config.method = config.webp_effort as i32;
+            let (w, h) = (image.width(), image.height());
 
-            let webp_data = encoder
-                .encode_advanced(&webp_config)
-                .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
+            let webp_data: WebPMemory;
+            if has_alpha {
+                let rgba = image.into_rgba8();
+                let encoder = webp::Encoder::from_rgba(rgba.as_raw(), w, h);
+
+                webp_data = encoder
+                    .encode_advanced(&webp_config)
+                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
+            } else {
+                let rgb = image.into_rgb8();
+                let encoder = webp::Encoder::from_rgb(rgb.as_raw(), w, h);
+
+                webp_data = encoder
+                    .encode_advanced(&webp_config)
+                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
+            }
 
             buffer.extend_from_slice(&webp_data);
         }
         Some("jxl") => {
             let runner = ThreadsRunner::default();
+            let has_alpha = image.color().has_alpha();
             let mut encoder = encoder_builder()
                 .speed(jxl_encoder_speed_from_int(config.jxl_speed))
                 .parallel_runner(&runner)
                 .quality(config.jxl_quality as f32 / 100.0) // Convert 0-100 to 0.0-1.0
+                .has_alpha(has_alpha)
                 .build()?;
-            let jxl_data: EncoderResult<u8> =
-                encoder.encode(&image.to_rgb8(), image.width(), image.height())?;
+
+            let jxl_data: EncoderResult<u8>;
+            if has_alpha {
+                let rgba = image.to_rgba8();
+                let frame = jpegxl_rs::encode::EncoderFrame::new(rgba.as_raw()).num_channels(4);
+                jxl_data = encoder.encode_frame(&frame, image.width(), image.height())?;
+            } else {
+                let rgb = image.to_rgb8();
+                let frame = jpegxl_rs::encode::EncoderFrame::new(rgb.as_raw()).num_channels(3);
+                jxl_data = encoder.encode_frame(&frame, image.width(), image.height())?;
+            }
             buffer.extend_from_slice(&jxl_data);
         }
         Some(other) => {

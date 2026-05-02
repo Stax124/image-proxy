@@ -17,6 +17,8 @@ pub struct EncodingConfig {
     pub webp_quality: u8,
     /// WebP effort level (0-6); higher is slower but better compression
     pub webp_effort: u8,
+    /// WebP lossless encoding
+    pub webp_lossless: bool,
 
     // JPEG XL encoding parameters
     pub jxl_quality: u8,
@@ -86,6 +88,10 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(4),
+            webp_lossless: std::env::var("IMAGE_PROXY_WEBP_LOSSLESS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(false),
             jxl_speed: std::env::var("IMAGE_PROXY_JXL_SPEED")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -152,6 +158,7 @@ impl Default for EncodingConfig {
             avif_speed: 6,
             webp_quality: 80,
             webp_effort: 4,
+            webp_lossless: false,
             jxl_speed: 7,
             jxl_quality: 75,
             resize_algorithm: ResizeAlgorithm::Auto,
