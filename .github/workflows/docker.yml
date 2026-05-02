@@ -4,9 +4,8 @@ on:
     push:
         tags:
             - "*"
-        branches:
-            - main
-            - rework-docker-ci # Temporary branch for testing new CI configuration, can be removed after successful merge
+        branches-ignore:
+            - "[0-9]*.[0-9]*.[0-9]*"
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
