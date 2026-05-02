@@ -1,10 +1,11 @@
+#[macro_use]
 mod common;
 
 use std::sync::Arc;
 
-use actix_web::{App, test};
-use common::{build_app_data, write_test_jpeg};
-use image_proxy::{api::image::process_image_request, config::EncodingConfig};
+use actix_web::test;
+use common::write_test_jpeg;
+use image_proxy::config::EncodingConfig;
 
 #[actix_web::test]
 async fn allowed_output_formats_rejects_disallowed() {
@@ -15,19 +16,7 @@ async fn allowed_output_formats_rejects_disallowed() {
         allowed_output_formats: Some(vec!["jpeg".to_string(), "png".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     let req = test::TestRequest::get()
         .uri("/photo.jpeg?format=webp")
@@ -45,19 +34,7 @@ async fn allowed_output_formats_permits_allowed() {
         allowed_output_formats: Some(vec!["jpeg".to_string(), "png".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     let req = test::TestRequest::get()
         .uri("/photo.jpeg?format=png")
@@ -83,19 +60,7 @@ async fn allowed_output_formats_none_allows_all() {
         allowed_output_formats: None,
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     let req = test::TestRequest::get()
         .uri("/photo.jpeg?format=webp")
@@ -114,19 +79,7 @@ async fn allowed_output_formats_no_format_param_bypasses_check() {
         allowed_output_formats: Some(vec!["png".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     let req = test::TestRequest::get().uri("/photo.jpeg").to_request();
     let resp = test::call_service(&app, req).await;

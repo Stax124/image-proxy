@@ -1,8 +1,8 @@
+#[macro_use]
 mod common;
 
-use actix_web::{App, test};
-use common::build_app_data;
-use image_proxy::{api::image::process_image_request, config::EncodingConfig};
+use actix_web::test;
+use image_proxy::config::EncodingConfig;
 use std::sync::Arc;
 
 #[actix_web::test]
@@ -19,19 +19,7 @@ async fn directory_traversal_prevented() {
         root_path: root.to_str().unwrap().to_string(),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Attempt directory traversal
     let req = test::TestRequest::get().uri("/../secret.jpeg").to_request();

@@ -1,10 +1,11 @@
+#[macro_use]
 mod common;
 
 use std::sync::Arc;
 
-use actix_web::{App, test};
-use common::{build_app_data, write_test_jpeg};
-use image_proxy::{api::image::process_image_request, config::EncodingConfig};
+use actix_web::test;
+use common::write_test_jpeg;
+use image_proxy::config::EncodingConfig;
 
 // ── Auto-format via Accept header (preferred_formats) ───────────────
 
@@ -17,19 +18,7 @@ async fn auto_format_returns_webp_when_accept_supports_it() {
         preferred_formats: Some(vec!["webp".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // A size param triggers the pipeline; Accept header signals webp support
     let req = test::TestRequest::get()
@@ -57,19 +46,7 @@ async fn auto_format_returns_avif_when_preferred_and_accepted() {
         preferred_formats: Some(vec!["avif".to_string(), "webp".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Chrome-like Accept header that supports avif
     let req = test::TestRequest::get()
@@ -97,19 +74,7 @@ async fn auto_format_falls_back_when_browser_does_not_support_preferred() {
         preferred_formats: Some(vec!["jxl".to_string(), "avif".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Browser only supports jpeg and png — none of the preferred formats
     let req = test::TestRequest::get()
@@ -137,19 +102,7 @@ async fn auto_format_explicit_format_param_overrides_accept_header() {
         preferred_formats: Some(vec!["webp".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Explicit format=png should override the Accept-based auto-format
     let req = test::TestRequest::get()
@@ -177,19 +130,7 @@ async fn auto_format_disabled_when_preferred_formats_not_configured() {
         preferred_formats: None,
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Browser supports webp, but preferred_formats is None — should keep original jpeg
     let req = test::TestRequest::get()
@@ -218,19 +159,7 @@ async fn auto_format_respects_allowed_output_formats() {
         allowed_output_formats: Some(vec!["jpeg".to_string(), "webp".to_string()]),
         ..EncodingConfig::default()
     });
-    let (cfg, client, cache, reg, pd, rc) = build_app_data(config);
-
-    let app = test::init_service(
-        App::new()
-            .app_data(cfg)
-            .app_data(client)
-            .app_data(cache)
-            .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
-            .service(process_image_request),
-    )
-    .await;
+    let app = init_test_app!(config);
 
     // Browser supports both avif and webp, but allowed_output_formats excludes avif
     let req = test::TestRequest::get()
