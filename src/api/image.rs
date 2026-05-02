@@ -123,7 +123,6 @@ pub async fn process_image_request(
             .get("Accept")
             .and_then(|v| v.to_str().ok())
             .unwrap_or(""),
-        false,
     );
     let content_type = mime_type_for_format(Some(effective_format.as_str()));
 

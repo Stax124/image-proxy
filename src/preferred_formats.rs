@@ -1,13 +1,9 @@
-/// Formats that properly compress alpha and should be preferred when the source image has an alpha channel
-const ALPHA_PREFERRED_FORMATS: &[&str] = &["jxl", "webp"];
-
-/// Determines the preferred output format based on the configuration, preselected format, file extension, browser support, and alpha channel presence
+/// Determines the preferred output format based on the configuration, preselected format, file extension, and browser support
 pub fn get_preferred_format(
     config: &crate::config::EncodingConfig,
     preselected_format: Option<String>,
     file_extension: &str,
     accept_header: &str,
-    has_alpha_channel: bool,
 ) -> String {
     // To simplyfy the logic inside the API endpoint
     if let Some(preselected) = preselected_format {
@@ -32,15 +28,6 @@ pub fn get_preferred_format(
             .iter()
             .any(|b| b == format)
     };
-
-    // If the source image has an alpha channel, prefer formats that properly compress alpha
-    if has_alpha_channel {
-        for &format in ALPHA_PREFERRED_FORMATS {
-            if preferred_formats.iter().any(|f| f == format) && is_available(format) {
-                return format.to_string();
-            }
-        }
-    }
 
     // Otherwise, return the first preferred format that passes filters
     preferred_formats
@@ -83,7 +70,6 @@ mod tests {
             Some("avif".to_string()),
             "png",
             "image/avif,image/png",
-            false,
         );
         assert_eq!(result, "avif");
     }
@@ -94,7 +80,7 @@ mod tests {
             preferred_formats: Some(vec![]),
             ..Default::default()
         };
-        let result = get_preferred_format(&config, None, "png", "image/avif,image/png", false);
+        let result = get_preferred_format(&config, None, "png", "image/avif,image/png");
         assert_eq!(result, "png");
     }
 
@@ -105,7 +91,7 @@ mod tests {
             allowed_output_formats: Some(vec!["webp".to_string()]),
             ..Default::default()
         };
-        let result = get_preferred_format(&config, None, "png", "image/webp", false);
+        let result = get_preferred_format(&config, None, "png", "image/webp");
         assert_eq!(result, "webp");
     }
 
@@ -115,33 +101,8 @@ mod tests {
             preferred_formats: Some(vec!["jxl".to_string(), "avif".to_string()]),
             ..Default::default()
         };
-        let result = get_preferred_format(&config, None, "png", "image/avif", false);
+        let result = get_preferred_format(&config, None, "png", "image/avif");
         assert_eq!(result, "avif");
-    }
-
-    #[test]
-    fn test_get_preferred_format_alpha_preferred() {
-        let config = EncodingConfig {
-            preferred_formats: Some(vec![
-                "png".to_string(),
-                "jxl".to_string(),
-                "webp".to_string(),
-            ]),
-            ..Default::default()
-        };
-        let result =
-            get_preferred_format(&config, None, "png", "image/png,image/jxl,image/webp", true);
-        assert_eq!(result, "jxl"); // First in ALPHA_PREFERRED_FORMATS that matches
-    }
-
-    #[test]
-    fn test_get_preferred_format_alpha_no_match_fallback() {
-        let config = EncodingConfig {
-            preferred_formats: Some(vec!["png".to_string(), "avif".to_string()]),
-            ..Default::default()
-        };
-        let result = get_preferred_format(&config, None, "png", "image/png,image/avif", true);
-        assert_eq!(result, "png"); // No alpha-preferred match, first preferred
     }
 
     #[test]
