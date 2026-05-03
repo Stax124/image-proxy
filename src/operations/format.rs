@@ -59,7 +59,7 @@ pub fn convert_image_format(
             let mut webp_config = WebPConfig::new()
                 .map_err(|e| anyhow::anyhow!("Failed to create WebPConfig: {:?}", e))?;
             webp_config.lossless = config.webp_lossless as i32;
-            webp_config.alpha_compression = 1;
+            webp_config.alpha_compression = if config.webp_lossless { 0 } else { 1 };
             webp_config.quality = config.webp_quality as f32;
             webp_config.method = config.webp_effort as i32;
             let (w, h) = (image.width(), image.height());
