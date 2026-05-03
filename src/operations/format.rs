@@ -58,7 +58,7 @@ pub fn convert_image_format(
             let has_alpha = image.color().has_alpha();
             let mut webp_config = WebPConfig::new()
                 .map_err(|e| anyhow::anyhow!("Failed to create WebPConfig: {:?}", e))?;
-            webp_config.lossless = 0;
+            webp_config.lossless = config.webp_lossless as i32;
             webp_config.alpha_compression = 1;
             webp_config.quality = config.webp_quality as f32;
             webp_config.method = config.webp_effort as i32;
@@ -219,6 +219,29 @@ mod tests {
 
         // Higher quality should produce larger output
         assert!(bytes_high.len() > bytes_low.len());
+    }
+
+    #[test]
+    fn convert_webp_lossless_check_pixels() {
+        let img = make_rgb_image(64, 64);
+        let mut config = test_config();
+        config.webp_lossless = true;
+
+        let bytes = convert_image_format(img.clone(), Some("webp"), &config).unwrap();
+
+        // Decode the WebP output and compare every pixel
+        let decoded = image::load_from_memory_with_format(&bytes, image::ImageFormat::WebP)
+            .expect("Failed to decode lossless WebP");
+
+        let original_rgba = img.to_rgba8();
+        let decoded_rgba = decoded.to_rgba8();
+
+        assert_eq!(original_rgba.dimensions(), decoded_rgba.dimensions());
+        assert_eq!(
+            original_rgba.as_raw(),
+            decoded_rgba.as_raw(),
+            "Lossless WebP roundtrip produced different pixels"
+        );
     }
 
     #[test]
