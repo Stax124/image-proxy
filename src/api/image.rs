@@ -278,6 +278,7 @@ pub async fn process_image_request(
     .await
     .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
     .map_err(|e| {
+        tracing::error!("Image processing error: {:?}", e);
         actix_web::error::ErrorInternalServerError(format!("Failed to convert image: {}", e))
     })?;
 

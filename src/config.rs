@@ -24,6 +24,8 @@ pub struct EncodingConfig {
     pub jxl_quality: u8,
     /// JPEG XL encoding speed (0-10); higher is faster but worse compression
     pub jxl_speed: u8,
+    /// JPEG XL lossless encoding
+    pub jxl_lossless: bool,
 
     // Resizing parameters
     pub resize_algorithm: ResizeAlgorithm,
@@ -100,6 +102,10 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(75),
+            jxl_lossless: std::env::var("IMAGE_PROXY_JXL_LOSSLESS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(false),
             resize_algorithm: std::env::var("IMAGE_PROXY_RESIZE_ALGORITHM")
                 .ok()
                 .and_then(|s| ResizeAlgorithm::from_str(&s))
@@ -161,6 +167,7 @@ impl Default for EncodingConfig {
             webp_lossless: false,
             jxl_speed: 7,
             jxl_quality: 75,
+            jxl_lossless: false,
             resize_algorithm: ResizeAlgorithm::Auto,
             root_path: "/tmp/test-images".to_string(),
             strip_path: None,

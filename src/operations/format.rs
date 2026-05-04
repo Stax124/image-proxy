@@ -87,21 +87,32 @@ pub fn convert_image_format(
             let runner = ThreadsRunner::default();
             let has_alpha = image.color().has_alpha();
             let mut encoder = encoder_builder()
+                .lossless(config.jxl_lossless)
+                .uses_original_profile(config.jxl_lossless)
+                .quality(if config.jxl_lossless {
+                    0.0
+                } else {
+                    config.jxl_quality as f32 / 100.0
+                })
+                .has_alpha(has_alpha)
                 .speed(jxl_encoder_speed_from_int(config.jxl_speed))
                 .parallel_runner(&runner)
-                .quality(config.jxl_quality as f32 / 100.0) // Convert 0-100 to 0.0-1.0
-                .has_alpha(has_alpha)
-                .build()?;
+                .build()
+                .unwrap();
 
             let jxl_data: EncoderResult<u8>;
             if has_alpha {
                 let rgba = image.to_rgba8();
                 let frame = jpegxl_rs::encode::EncoderFrame::new(rgba.as_raw()).num_channels(4);
-                jxl_data = encoder.encode_frame(&frame, image.width(), image.height())?;
+                jxl_data = encoder
+                    .encode_frame(&frame, image.width(), image.height())
+                    .unwrap();
             } else {
                 let rgb = image.to_rgb8();
                 let frame = jpegxl_rs::encode::EncoderFrame::new(rgb.as_raw()).num_channels(3);
-                jxl_data = encoder.encode_frame(&frame, image.width(), image.height())?;
+                jxl_data = encoder
+                    .encode_frame(&frame, image.width(), image.height())
+                    .unwrap();
             }
             buffer.extend_from_slice(&jxl_data);
         }
@@ -263,6 +274,27 @@ mod tests {
     fn convert_to_jxl() {
         let img = make_rgb_image(64, 64);
         let config = test_config();
+        let bytes = convert_image_format(img, Some("jxl"), &config).unwrap();
+        // JPEG XL container starts with 0x000000_0C_4A584C20 or naked codestream with 0xFF0A
+        assert!(bytes.len() > 2);
+        let is_jxl_container = bytes.len() >= 12
+            && bytes[0] == 0x00
+            && bytes[1] == 0x00
+            && bytes[2] == 0x00
+            && bytes[3] == 0x0C;
+        let is_jxl_codestream = bytes[0] == 0xFF && bytes[1] == 0x0A;
+        assert!(
+            is_jxl_container || is_jxl_codestream,
+            "Expected JXL magic bytes, got: {:02X?}",
+            &bytes[..bytes.len().min(12)]
+        );
+    }
+
+    #[test]
+    fn convert_to_jxl_lossless() {
+        let img = make_rgb_image(64, 64);
+        let mut config = test_config();
+        config.jxl_lossless = true;
         let bytes = convert_image_format(img, Some("jxl"), &config).unwrap();
         // JPEG XL container starts with 0x000000_0C_4A584C20 or naked codestream with 0xFF0A
         assert!(bytes.len() > 2);
