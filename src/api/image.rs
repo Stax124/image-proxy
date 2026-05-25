@@ -15,7 +15,16 @@ use futures_util::TryStreamExt;
 use prometheus::{HistogramVec, IntCounterVec};
 use tokio_util::io::ReaderStream;
 
-const SUPPORTED_INPUT_FORMATS: &[&str] = &["avif", "jpeg", "jpg", "png", "webp"];
+/// List of formats that we allow through, but we cannot process them. Developers should only mount image directories to
+/// this container, but some paths may still point to images in unsupported formats. This should make transitioning easier and allow for more flexible configurations
+/// while not opening ourselves to security risks and DoS attacks by fully allowing all formats.
+const NON_PROCESSABLE_FORMATS: &[&str] = &["svg", "ico", "gif", "bmp", "tiff", "jxl"];
+
+/// List of formats that we support as input. Used to validate incoming requests early and reject unsupported formats
+/// before doing any expensive work. Includes non-processable formats as well, they will be filtered out later in the pipeline.
+const SUPPORTED_INPUT_FORMATS: &[&str] = &[
+    "avif", "jpeg", "jpg", "png", "webp", "svg", "ico", "gif", "bmp", "tiff", "jxl",
+];
 
 pub fn add_headers_for_caching(
     response: &mut actix_web::HttpResponseBuilder,
@@ -188,7 +197,7 @@ pub async fn process_image_request(
         return Ok(builder.streaming(stream));
     }
 
-    let image_bytes: Bytes;
+    let mut image_bytes: Bytes;
     if !sanitized_disk_path.exists() {
         // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some()
@@ -254,38 +263,42 @@ pub async fn process_image_request(
             .into();
     }
 
-    // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
-    let config_for_pipeline = config.get_ref().clone();
-    let pipeline_duration = pipeline_duration.get_ref().clone();
-    let effective_format_clone = effective_format.clone();
-    let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
-        let image = {
-            let _timer = pipeline_duration
-                .with_label_values(&["decode"])
-                .start_timer();
-            image::load_from_memory(&image_bytes)?
-        };
-        let bytes = crate::operations::pipeline::image_pipeline(
-            image,
-            size_param,
-            &effective_format_clone,
-            &config_for_pipeline,
-            resize_algorithm_param,
-            Some(&pipeline_duration),
-        )?;
-        Ok(bytes)
-    })
-    .await
-    .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
-    .map_err(|e| {
-        tracing::error!("Image processing error: {:?}", e);
-        actix_web::error::ErrorInternalServerError(format!("Failed to convert image: {}", e))
-    })?;
+    // Check if we have a non-processable format that we allow through. If so, return it directly without attempting to process it, even if transformation parameters are present.
+    if !NON_PROCESSABLE_FORMATS.contains(&ext.as_str()) {
+        // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
+        let config_for_pipeline = config.get_ref().clone();
+        let pipeline_duration = pipeline_duration.get_ref().clone();
+        let effective_format_clone = effective_format.clone();
+        let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
+            let image = {
+                let _timer = pipeline_duration
+                    .with_label_values(&["decode"])
+                    .start_timer();
+                image::load_from_memory(&image_bytes)?
+            };
+            let bytes = crate::operations::pipeline::image_pipeline(
+                image,
+                size_param,
+                &effective_format_clone,
+                &config_for_pipeline,
+                resize_algorithm_param,
+                Some(&pipeline_duration),
+            )?;
+            Ok(bytes)
+        })
+        .await
+        .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
+        .map_err(|e| {
+            tracing::error!("Image processing error: {:?}", e);
+            actix_web::error::ErrorInternalServerError(format!("Failed to convert image: {}", e))
+        })?;
+
+        image_bytes = Bytes::from(result_image_bytes);
+    }
 
     // Store the transformed result in cache
-    let result_image_bytes = Bytes::from(result_image_bytes);
     if let Some(cache) = cache.get_ref() {
-        cache.insert(cache_key, result_image_bytes.clone());
+        cache.insert(cache_key, image_bytes.clone());
     }
 
     request_count
@@ -295,5 +308,5 @@ pub async fn process_image_request(
     builder.content_type(content_type);
     builder.insert_header((config.cache_status_header.clone(), "MISS"));
     add_headers_for_caching(&mut builder, &config);
-    Ok(builder.body(result_image_bytes))
+    Ok(builder.body(image_bytes))
 }

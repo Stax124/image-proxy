@@ -72,6 +72,7 @@ curl -H "Sec-CH-DPR: 2.0" http://localhost:8000/photo.jpg?size=400
 ### Behavior
 
 - **No transformation parameters** — The raw file is streamed directly without decoding or re-encoding.
+- **Non-processable format** (SVG, ICO, GIF, BMP, TIFF, JXL) — The file is served as-is without processing, even if transformation parameters are present.
 - **With transformations** — The image is decoded, processed through the pipeline (resize → encode), and the result is cached if caching is enabled.
 - **File not found + fallback URL** — The image is fetched from the configured `IMAGE_PROXY_FALLBACK_IMAGE_URL`, transformed, and served. The response size is capped by `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE`.
 - **File not found + no fallback** — Returns `404 Not Found`.

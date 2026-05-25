@@ -6,13 +6,24 @@ icon: Image
 
 ## Supported Formats
 
-| Format        | Input | Output | Notes                                   |
-| ------------- | :---: | :----: | --------------------------------------- |
-| AVIF          |   ✓   |   ✓    | Native codec via image crate with dav1d |
-| JPEG / JPG    |   ✓   |   ✓    | —                                       |
-| PNG           |   ✓   |   ✓    | Lossless                                |
-| WebP          |   ✓   |   ✓    | —                                       |
-| JPEG XL (JXL) |   ✗   |   ✓    | Output only; requires libjxl            |
+| Format        | Input | Output | Processing | Notes                                       |
+| ------------- | :---: | :----: | :--------: | ------------------------------------------- |
+| AVIF          |   ✓   |   ✓    |     ✓      | Native codec via image crate with dav1d     |
+| JPEG / JPG    |   ✓   |   ✓    |     ✓      | —                                           |
+| PNG           |   ✓   |   ✓    |     ✓      | Lossless                                    |
+| WebP          |   ✓   |   ✓    |     ✓      | —                                           |
+| JPEG XL (JXL) |   ✓   |   ✓    |     ✗      | Output encoding only; pass-through on input |
+| SVG           |   ✓   |   ✗    |     ✗      | Pass-through only                           |
+| ICO           |   ✓   |   ✗    |     ✗      | Pass-through only                           |
+| GIF           |   ✓   |   ✗    |     ✗      | Pass-through only                           |
+| BMP           |   ✓   |   ✗    |     ✗      | Pass-through only                           |
+| TIFF          |   ✓   |   ✗    |     ✗      | Pass-through only                           |
+
+## Non-Processable Formats
+
+SVG, ICO, GIF, BMP, TIFF, and JXL are accepted as input but are **not processed** through the image pipeline. They are served directly as-is, even if transformation parameters (e.g., `size`, `format`) are present in the request.
+
+This allows flexible deployment where image directories may contain a mix of formats, without opening the service to security risks or DoS attacks from attempting to decode unsupported formats.
 
 ## Quality & Encoding Settings
 

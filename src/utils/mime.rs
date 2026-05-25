@@ -5,6 +5,11 @@ pub fn mime_type_for_format(format: Option<&str>) -> &'static str {
         Some("png") => "image/png",
         Some("webp") => "image/webp",
         Some("jxl") => "image/jxl",
+        Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
+        Some("gif") => "image/gif",
+        Some("bmp") => "image/bmp",
+        Some("tiff") => "image/tiff",
         _ => "application/octet-stream",
     }
 }
@@ -21,11 +26,7 @@ mod tests {
     #[test]
     fn mime_type_unknown_format() {
         assert_eq!(
-            mime_type_for_format(Some("bmp")),
-            "application/octet-stream"
-        );
-        assert_eq!(
-            mime_type_for_format(Some("tiff")),
+            mime_type_for_format(Some("xyz")),
             "application/octet-stream"
         );
     }

@@ -6,6 +6,7 @@ A lightweight HTTP image-serving and transformation proxy written in Rust.
 
 - On-the-fly resize with preserved aspect ratio
 - Format conversion: **AVIF**, **JPEG**, **PNG**, **WebP**, **JPEG XL (output only)**
+- Pass-through support for non-processable input formats: **SVG**, **ICO**, **GIF**, **BMP**, **TIFF**, **JXL**
 - Fast pass-through when no transformation is requested (no decode/re-encode)
 - Hybrid in-memory and disk response cache (via [foyer](https://github.com/foyer-rs/foyer))
 - Prometheus metrics endpoint (`/metrics`)

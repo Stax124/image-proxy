@@ -43,7 +43,7 @@ async fn rejects_unsupported_format() {
     let config = test_config(dir.path().to_str().unwrap());
     let app = init_test_app!(config);
 
-    let req = test::TestRequest::get().uri("/photo.bmp").to_request();
+    let req = test::TestRequest::get().uri("/photo.exe").to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 415);
 }
