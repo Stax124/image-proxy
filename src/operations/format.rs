@@ -4,6 +4,10 @@ use webp::{WebPConfig, WebPMemory};
 
 use crate::{config::EncodingConfig, utils::jxl_encoder_speed_from_int};
 
+thread_local! {
+    static JXL_RUNNER: std::cell::RefCell<Option<ThreadsRunner<'static>>> = const { std::cell::RefCell::new(None) };
+}
+
 #[tracing::instrument(level = "debug", skip_all, fields(format = ?format))]
 pub fn convert_image_format(
     image: DynamicImage,
@@ -64,56 +68,59 @@ pub fn convert_image_format(
             webp_config.method = config.webp_effort as i32;
             let (w, h) = (image.width(), image.height());
 
-            let webp_data: WebPMemory;
-            if has_alpha {
+            let webp_data: WebPMemory = if has_alpha {
                 let rgba = image.into_rgba8();
                 let encoder = webp::Encoder::from_rgba(rgba.as_raw(), w, h);
 
-                webp_data = encoder
+                encoder
                     .encode_advanced(&webp_config)
-                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?
             } else {
                 let rgb = image.into_rgb8();
                 let encoder = webp::Encoder::from_rgb(rgb.as_raw(), w, h);
 
-                webp_data = encoder
+                encoder
                     .encode_advanced(&webp_config)
-                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?;
-            }
+                    .map_err(|e| anyhow::anyhow!("Failed to encode WebP image: {:?}", e))?
+            };
 
             buffer.extend_from_slice(&webp_data);
         }
         Some("jxl") => {
-            let runner = ThreadsRunner::default();
+            let (w, h) = (image.width(), image.height());
             let has_alpha = image.color().has_alpha();
-            let mut encoder = encoder_builder()
-                .lossless(config.jxl_lossless)
-                .uses_original_profile(config.jxl_lossless)
-                .quality(if config.jxl_lossless {
-                    0.0
-                } else {
-                    config.jxl_quality as f32 / 100.0
-                })
-                .has_alpha(has_alpha)
-                .speed(jxl_encoder_speed_from_int(config.jxl_speed))
-                .parallel_runner(&runner)
-                .build()
-                .unwrap();
 
-            let jxl_data: EncoderResult<u8>;
-            if has_alpha {
-                let rgba = image.to_rgba8();
-                let frame = jpegxl_rs::encode::EncoderFrame::new(rgba.as_raw()).num_channels(4);
-                jxl_data = encoder
-                    .encode_frame(&frame, image.width(), image.height())
+            let jxl_data: EncoderResult<u8> = JXL_RUNNER.with(|cell| {
+                let mut slot = cell.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(ThreadsRunner::default());
+                }
+                let runner = slot.as_ref().unwrap();
+
+                let mut encoder = encoder_builder()
+                    .lossless(config.jxl_lossless)
+                    .uses_original_profile(config.jxl_lossless)
+                    .quality(if config.jxl_lossless {
+                        0.0
+                    } else {
+                        config.jxl_quality as f32 / 100.0
+                    })
+                    .has_alpha(has_alpha)
+                    .speed(jxl_encoder_speed_from_int(config.jxl_speed))
+                    .parallel_runner(runner)
+                    .build()
                     .unwrap();
-            } else {
-                let rgb = image.to_rgb8();
-                let frame = jpegxl_rs::encode::EncoderFrame::new(rgb.as_raw()).num_channels(3);
-                jxl_data = encoder
-                    .encode_frame(&frame, image.width(), image.height())
-                    .unwrap();
-            }
+
+                if has_alpha {
+                    let rgba = image.into_rgba8();
+                    let frame = jpegxl_rs::encode::EncoderFrame::new(rgba.as_raw()).num_channels(4);
+                    encoder.encode_frame(&frame, w, h).unwrap()
+                } else {
+                    let rgb = image.into_rgb8();
+                    let frame = jpegxl_rs::encode::EncoderFrame::new(rgb.as_raw()).num_channels(3);
+                    encoder.encode_frame(&frame, w, h).unwrap()
+                }
+            });
             buffer.extend_from_slice(&jxl_data);
         }
         Some(other) => {

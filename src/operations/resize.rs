@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use image::DynamicImage;
 
 /// The algorithm to use when resizing an image.
@@ -12,13 +14,15 @@ pub enum ResizeAlgorithm {
     Auto,
 }
 
-impl ResizeAlgorithm {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for ResizeAlgorithm {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
-            "lanczos3" => Some(Self::Lanczos3),
-            "thumbnail" => Some(Self::Thumbnail),
-            "auto" => Some(Self::Auto),
-            _ => None,
+            "lanczos3" => Ok(Self::Lanczos3),
+            "thumbnail" => Ok(Self::Thumbnail),
+            "auto" => Ok(Self::Auto),
+            _ => Err(()),
         }
     }
 }
@@ -102,7 +106,7 @@ mod tests {
     fn from_str_lanczos3() {
         assert_eq!(
             ResizeAlgorithm::from_str("lanczos3"),
-            Some(ResizeAlgorithm::Lanczos3)
+            Ok(ResizeAlgorithm::Lanczos3)
         );
     }
 
@@ -110,7 +114,7 @@ mod tests {
     fn from_str_thumbnail() {
         assert_eq!(
             ResizeAlgorithm::from_str("thumbnail"),
-            Some(ResizeAlgorithm::Thumbnail)
+            Ok(ResizeAlgorithm::Thumbnail)
         );
     }
 
@@ -118,7 +122,7 @@ mod tests {
     fn from_str_auto() {
         assert_eq!(
             ResizeAlgorithm::from_str("auto"),
-            Some(ResizeAlgorithm::Auto)
+            Ok(ResizeAlgorithm::Auto)
         );
     }
 
@@ -126,23 +130,23 @@ mod tests {
     fn from_str_case_insensitive() {
         assert_eq!(
             ResizeAlgorithm::from_str("LANCZOS3"),
-            Some(ResizeAlgorithm::Lanczos3)
+            Ok(ResizeAlgorithm::Lanczos3)
         );
         assert_eq!(
             ResizeAlgorithm::from_str("Thumbnail"),
-            Some(ResizeAlgorithm::Thumbnail)
+            Ok(ResizeAlgorithm::Thumbnail)
         );
         assert_eq!(
             ResizeAlgorithm::from_str("AUTO"),
-            Some(ResizeAlgorithm::Auto)
+            Ok(ResizeAlgorithm::Auto)
         );
     }
 
     #[test]
     fn from_str_invalid() {
-        assert_eq!(ResizeAlgorithm::from_str(""), None);
-        assert_eq!(ResizeAlgorithm::from_str("bilinear"), None);
-        assert_eq!(ResizeAlgorithm::from_str("nearest"), None);
+        assert_eq!(ResizeAlgorithm::from_str(""), Err(()));
+        assert_eq!(ResizeAlgorithm::from_str("bilinear"), Err(()));
+        assert_eq!(ResizeAlgorithm::from_str("nearest"), Err(()));
     }
 
     // --- resize_image ---

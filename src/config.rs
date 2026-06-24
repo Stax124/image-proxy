@@ -108,7 +108,7 @@ impl EncodingConfig {
                 .unwrap_or(false),
             resize_algorithm: std::env::var("IMAGE_PROXY_RESIZE_ALGORITHM")
                 .ok()
-                .and_then(|s| ResizeAlgorithm::from_str(&s))
+                .and_then(|s| s.parse::<ResizeAlgorithm>().ok())
                 .unwrap_or(ResizeAlgorithm::Auto),
             root_path: std::env::var("IMAGE_PROXY_ROOT_PATH")
                 .unwrap_or_else(|_| "/app/data".to_string()),
@@ -139,7 +139,7 @@ impl EncodingConfig {
             cache_memory_max_item_size: std::env::var("IMAGE_PROXY_CACHE_MAX_ITEM_SIZE")
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .unwrap_or(1 * 1024 * 1024), // Default to 1 MB
+                .unwrap_or(1024 * 1024), // Default to 1 MB
             cache_control_header: std::env::var("IMAGE_PROXY_CACHE_CONTROL_HEADER")
                 .ok()
                 .unwrap_or("public, max-age=31536000, no-transform".to_string()), // Sane default for caching images for 1 year with no transformations allowed by downstream caches (Fastly, Cloudflare, etc.)

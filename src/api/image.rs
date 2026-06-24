@@ -38,6 +38,7 @@ pub fn add_headers_for_caching(
 
 #[actix_web::get("/{filename:.*}")]
 #[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
+#[allow(clippy::too_many_arguments)]
 pub async fn process_image_request(
     req: HttpRequest,
     filename: web::Path<String>,
@@ -108,19 +109,21 @@ pub async fn process_image_request(
         });
     let resize_algorithm_param = query_params
         .get("resize_algorithm")
-        .and_then(|s| ResizeAlgorithm::from_str(s));
+        .and_then(|s| s.parse::<ResizeAlgorithm>().ok());
 
     // If user requested an explicit output format, check if it's allowed by configuration, if not, reject the request early before doing any expensive work
-    if let Some(fmt) = format_param.as_ref()
-        && let Some(allowed_formats) = &config.allowed_output_formats
-    {
-        if !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt)) {
+    match format_param.as_ref() {
+        Some(fmt)
+            if let Some(allowed_formats) = &config.allowed_output_formats
+                && !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt)) =>
+        {
             request_count
                 .with_label_values(&[fmt.as_str(), "unsupported_media_type"])
                 .inc();
             return Ok(HttpResponse::UnsupportedMediaType()
                 .body(format!("Requested output format '{}' is not allowed", fmt)));
         }
+        _ => (),
     }
 
     // Use the explicitly requested format, or fall back to the original file's format
@@ -140,24 +143,24 @@ pub async fn process_image_request(
         "{}?format={}&size={}&resize={}&dpr={}",
         sanitized_path.display(),
         effective_format,
-        size_param.map_or_else(|| "none".to_string(), |s| s.to_string()),
-        resize_algorithm_param.map_or_else(|| "none".to_string(), |r| format!("{:?}", r)),
-        dpr_param.map_or_else(|| "none".to_string(), |d| format!("{:.2}", d)),
+        size_param.map_or_else(|| "".to_string(), |s| s.to_string()),
+        resize_algorithm_param.map_or_else(|| "".to_string(), |r| format!("{:?}", r)),
+        dpr_param.map_or_else(|| "".to_string(), |d| format!("{:.2}", d)),
     );
 
     // Check cache for a hit before doing any expensive work
-    if let Some(cache) = cache.get_ref() {
-        if let Ok(Some(entry)) = cache.get(&cache_key).await {
-            tracing::debug!(cache_key = %cache_key, "cache hit");
-            request_count
-                .with_label_values(&[effective_format.as_str(), "ok"])
-                .inc();
-            let mut builder = HttpResponse::Ok();
-            builder.content_type(content_type);
-            builder.insert_header((config.cache_status_header.clone(), "HIT"));
-            add_headers_for_caching(&mut builder, &config);
-            return Ok(builder.body(entry.value().clone()));
-        }
+    if let Some(cache) = cache.get_ref()
+        && let Ok(Some(entry)) = cache.get(&cache_key).await
+    {
+        tracing::debug!(cache_key = %cache_key, "cache hit");
+        request_count
+            .with_label_values(&[effective_format.as_str(), "ok"])
+            .inc();
+        let mut builder = HttpResponse::Ok();
+        builder.content_type(content_type);
+        builder.insert_header((config.cache_status_header.clone(), "HIT"));
+        add_headers_for_caching(&mut builder, &config);
+        return Ok(builder.body(entry.value().clone()));
     }
 
     // Stream local files directly when no transformation is requested.
@@ -266,7 +269,7 @@ pub async fn process_image_request(
     // Check if we have a non-processable format that we allow through. If so, return it directly without attempting to process it, even if transformation parameters are present.
     if !NON_PROCESSABLE_FORMATS.contains(&ext.as_str()) {
         // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
-        let config_for_pipeline = config.get_ref().clone();
+        let config_for_pipeline = config.clone();
         let pipeline_duration = pipeline_duration.get_ref().clone();
         let effective_format_clone = effective_format.clone();
         let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
@@ -280,7 +283,7 @@ pub async fn process_image_request(
                 image,
                 size_param,
                 &effective_format_clone,
-                &config_for_pipeline,
+                config_for_pipeline.get_ref(),
                 resize_algorithm_param,
                 Some(&pipeline_duration),
             )?;

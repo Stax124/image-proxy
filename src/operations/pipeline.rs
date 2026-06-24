@@ -22,9 +22,7 @@ pub fn image_pipeline(
         let _timer = pipeline_duration.map(|h| h.with_label_values(&["resize"]).start_timer());
         resize_image(image, size, resize_algorithm, config)
     };
-    let result = {
-        let _timer = pipeline_duration.map(|h| h.with_label_values(&["encode"]).start_timer());
-        convert_image_format(image, Some(format), config)
-    };
-    result
+
+    let _timer = pipeline_duration.map(|h| h.with_label_values(&["encode"]).start_timer());
+    convert_image_format(image, Some(format), config)
 }

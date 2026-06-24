@@ -65,16 +65,16 @@ pub fn write_test_png_with_alpha(dir: &std::path::Path, name: &str) -> std::path
     path
 }
 
-pub fn build_app_data(
-    config: Arc<EncodingConfig>,
-) -> (
+type AppData = (
     web::Data<Arc<EncodingConfig>>,
     web::Data<awc::Client>,
     web::Data<Option<foyer::HybridCache<String, bytes::Bytes>>>,
     web::Data<prometheus::Registry>,
     web::Data<prometheus::HistogramVec>,
     web::Data<prometheus::IntCounterVec>,
-) {
+);
+
+pub fn build_app_data(config: Arc<EncodingConfig>) -> AppData {
     let (registry, pipeline_duration, request_count) = setup_metrics();
     let http_client = awc::Client::default();
     (

@@ -16,17 +16,16 @@ pub fn get_preferred_format(
     }
 
     let allowed_output_formats = config.allowed_output_formats.as_deref();
+    let browser_formats = extract_preferred_formats_from_accept_header(accept_header);
 
     // Check if a format passes both allowed and browser-support filters without allocating
     let is_available = |format: &str| -> bool {
-        if let Some(allowed) = allowed_output_formats {
-            if !allowed.iter().any(|a| a == format) {
-                return false;
-            }
+        if let Some(allowed) = allowed_output_formats
+            && !allowed.iter().any(|a| a == format)
+        {
+            return false;
         }
-        extract_preferred_formats_from_accept_header(accept_header)
-            .iter()
-            .any(|b| b == format)
+        browser_formats.iter().any(|b| b == format)
     };
 
     // Otherwise, return the first preferred format that passes filters
