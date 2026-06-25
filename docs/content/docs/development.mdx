@@ -15,3 +15,65 @@ IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=DEBUG cargo run --release
 - `IMAGE_PROXY_ROOT_PATH` — Must be overridden for development. Set it to any directory containing images for testing.
 - `RUST_LOG=DEBUG` — Enables detailed logs about request handling and transformations. Highly recommended when testing new features or troubleshooting.
 - `cargo run --release` — Release mode is important for realistic performance testing, especially for image transformations (debug mode is significantly slower, particularly for AVIF encoding).
+
+## Benchmarking
+
+To measure how many images per second the proxy can process on the current machine, use the built-in benchmark example (always run with `--release`):
+
+```bash
+cargo run --example bench --release
+```
+
+Example output:
+
+```
+image-proxy throughput benchmark
+scenario: passthrough  |  duration: 5s  |  concurrency: 64
+cache: disabled (raw processing)
+
+----------------------------------------
+Scenario: passthrough
+Images processed: 28431
+Elapsed: 5.01s
+Throughput: 5674.9 images/sec
+----------------------------------------
+```
+
+### Scenarios
+
+Pass the scenario as the first argument:
+
+| Command                                  | Description                              |
+|------------------------------------------|------------------------------------------|
+| `cargo run --example bench --release`    | Pass-through (fast path, no transforms)  |
+| `... resize-jpeg`                        | Resize + JPEG re-encode                  |
+| `... resize-webp`                        | Resize + WebP                            |
+| `... resize-avif`                        | Resize + AVIF (slowest)                  |
+| `... resize-jpeg-cached`                 | Same as above but with cache enabled + warmup |
+
+Tune with environment variables:
+
+```bash
+BENCH_DURATION=10 BENCH_CONCURRENCY=200 cargo run --example bench --release resize-jpeg
+```
+
+### Interpreting results
+
+- **Pass-through** is very fast (mostly limited by disk reads + actix worker threads).
+- Transforms are CPU-bound in the blocking thread pool (`web::block`).
+- AVIF encoding is by far the most expensive; expect much lower throughput.
+- Enabling the built-in cache (the `-cached` scenarios) dramatically improves repeated identical transforms.
+- Numbers are **localhost only**. Real traffic (TLS termination, network latency, CDN, multiple instances) will be lower.
+- Always use `--release`.
+
+### Using external tools (alternative)
+
+You can also benchmark against a manually started server:
+
+```bash
+IMAGE_PROXY_ROOT_PATH=./data/images cargo run --release &
+# in another shell:
+oha -c 128 -z 30s http://127.0.0.1:8000/204902-1.jpg
+```
+
+`oha` (Rust) or `wrk` work well. `oha` is easiest to install (`cargo install oha`).

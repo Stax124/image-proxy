@@ -26,6 +26,10 @@ cargo clippy --all-targets
 cargo fmt
 # Run locally (ROOT_PATH must point at a dir with images):
 IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=debug cargo run --release
+# Throughput benchmark (images/sec on this machine):
+cargo run --example bench --release
+cargo run --example bench --release resize-avif
+BENCH_DURATION=5 BENCH_CONCURRENCY=128 cargo run --example bench --release resize-jpeg
 ```
 
 Use `--release` for any performance testing — debug AVIF/JXL encoding is extremely slow. See [development docs](docs/content/docs/development.mdx).
