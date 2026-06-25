@@ -2,14 +2,14 @@ name: Rust Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "src/**"
       - "data/libjxl/**"
       - "Cargo.toml"
       - "Cargo.lock"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "src/**"
       - "data/libjxl/**"

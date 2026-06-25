@@ -19,6 +19,7 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 FROM chef AS planner
 COPY Cargo.toml Cargo.lock ./
 COPY image/Cargo.toml image/Cargo.toml
+COPY foyer/ foyer/
 COPY src/ src/
 COPY image/src/ image/src/
 RUN cargo chef prepare --recipe-path recipe.json
@@ -31,8 +32,9 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 
-# Copy the local path dependency needed by [patch.crates-io]
+# Copy the local path dependencies needed by [patch.crates-io] and foyer
 COPY image/ image/
+COPY foyer/ foyer/
 
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
