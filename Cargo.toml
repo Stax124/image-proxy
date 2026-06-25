@@ -8,7 +8,7 @@ actix-web = "4"
 anyhow = "1"
 awc = { version = "3.8", features = ["rustls"] }
 bytes = { version = "1", features = ["serde"] }
-foyer = { version = "0.22", features = ["serde"] }
+foyer = { path = "./foyer/foyer", features = ["serde"] }
 futures-util = "0.3"
 image = { version = "*", features = ["nasm", "avif-native"] }
 jpegxl-rs = { version = "=0.13.0" }

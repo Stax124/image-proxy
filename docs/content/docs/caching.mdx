@@ -30,7 +30,7 @@ IMAGE_PROXY_ENABLE_CACHE=true
 | `IMAGE_PROXY_CACHE_MEMORY_SIZE`   | `104857600` (100 MB) | Total in-memory cache capacity       |
 | `IMAGE_PROXY_CACHE_MAX_ITEM_SIZE` | `1048576` (1 MB)     | Maximum size of a single cached item |
 
-Items larger than `CACHE_MAX_ITEM_SIZE` are not stored in the cache. The cache uses **LRU eviction** with an 80% high-priority pool ratio and weights entries by `key_size + value_size` in bytes.
+Items larger than `CACHE_MAX_ITEM_SIZE` are not stored in the cache. The cache uses **Sieve eviction** and weights entries by `key_size + value_size` in bytes.
 
 ## Disk Cache
 

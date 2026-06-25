@@ -1,3 +1,6 @@
 [submodule "image"]
 	path = image
 	url = https://github.com/Stax124/image
+[submodule "foyer"]
+	path = foyer
+	url = https://github.com/Stax124/foyer

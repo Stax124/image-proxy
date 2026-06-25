@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use foyer::{
-    BlockEngineConfig, DeviceBuilder, EvictionConfig, FsDeviceBuilder, HybridCacheBuilder,
-    LruConfig, PsyncIoEngineConfig,
+    BlockEngineConfig, DeviceBuilder, FsDeviceBuilder, HybridCacheBuilder, PsyncIoEngineConfig,
+    SieveConfig,
 };
 use mixtrics::registry::prometheus::PrometheusMetricsRegistry;
 
@@ -24,9 +24,7 @@ pub async fn setup_cache(
                 prometheus_registry.clone(),
             )))
             .memory(config.cache_memory_size)
-            .with_eviction_config(EvictionConfig::Lru(LruConfig {
-                high_priority_pool_ratio: 0.8,
-            }))
+            .with_eviction_config(SieveConfig {})
             .with_weighter(|key: &String, value: &Bytes| key.len() + value.len())
             .with_filter(move |_, value: &Bytes| value.len() <= cache_memory_max_item_size)
             .storage()
@@ -43,9 +41,7 @@ pub async fn setup_cache(
                 prometheus_registry.clone(),
             )))
             .memory(config.cache_memory_size)
-            .with_eviction_config(EvictionConfig::Lru(LruConfig {
-                high_priority_pool_ratio: 0.8,
-            }))
+            .with_eviction_config(SieveConfig {})
             .with_weighter(|key: &String, value: &Bytes| key.len() + value.len())
             .with_filter(move |_, value: &Bytes| value.len() <= cache_memory_max_item_size)
             .storage()
