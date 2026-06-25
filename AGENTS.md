@@ -16,12 +16,14 @@ sudo apt install -y libdav1d7 libdav1d-dev nasm libhwy-dev libbrotli-dev
 cd data/libjxl && sudo dpkg -i libjxl_0.11.1_amd64.deb libjxl-dev_0.11.1_amd64.deb && sudo ldconfig
 ```
 
+Tests are run with `cargo pretty-test` (install once with `cargo install cargo-pretty-test`). It wraps `cargo test`, accepts the same arguments, and prints a hierarchically structured tree of results with a summary at the end.
+
 Common commands:
 
 ```bash
-cargo test                              # all tests (unit + integration in tests/)
-cargo test --test transformations       # one integration test file
-cargo test <name> -- --nocapture        # one test, show output
+cargo pretty-test                        # all tests (unit + integration in tests/)
+cargo pretty-test --test transformations # one integration test file
+cargo pretty-test <name> -- --nocapture  # one test, show output
 cargo clippy --all-targets
 cargo fmt
 # Run locally (ROOT_PATH must point at a dir with images):

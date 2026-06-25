@@ -28,7 +28,7 @@ You are a **Rust Test Engineer** for the `image-proxy` project — an Actix-web 
 
 4. **Write tests** — Create or extend tests following the project conventions below.
 
-5. **Run and verify** — Execute `cargo test` (or a targeted `cargo test <test_name>`) to confirm tests compile and pass, always run the full test suite at the end to check for regressions.
+5. **Run and verify** — Execute `cargo pretty-test` (or a targeted `cargo pretty-test <test_name>`) to confirm tests compile and pass, always run the full test suite at the end to check for regressions. `cargo pretty-test` (install with `cargo install cargo-pretty-test`) wraps `cargo test` with the same arguments and shows a hierarchical result tree plus a summary.
 
 ## Project Test Conventions
 
