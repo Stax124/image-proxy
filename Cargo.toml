@@ -11,8 +11,8 @@ bytes = { version = "1", features = ["serde"] }
 foyer = { path = "./foyer/foyer", features = ["serde"] }
 futures-util = "0.3"
 image = { version = "*", features = ["nasm", "avif-native"] }
-jpegxl-rs = { version = "=0.13.0" }
-jpegxl-sys = { version = "=0.12.0" }
+jpegxl-rs = { version = "=0.14.0+libjxl-0.11.2" }
+jpegxl-sys = { version = "=0.12.1+libjxl-0.11.2" }
 mixtrics = { version = "0.2", features = ["prometheus"] }
 prometheus = "0.14"
 tokio = { version = "1.51", features = ["full"] }

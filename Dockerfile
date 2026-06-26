@@ -2,7 +2,7 @@
 # Chef stage (pre-built cargo-chef image)
 ################################################################################
 
-FROM lukemathwalker/cargo-chef:latest-rust-1.95.0-alpine AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.96.0-alpine AS chef
 WORKDIR /app
 
 # Install build dependencies needed to compile Rust crates on Alpine

@@ -35,7 +35,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Update apt packages
         run: sudo apt update
@@ -46,7 +46,7 @@ jobs:
       - name: Install libjxl from local directory
         run: |
           cd ./data/libjxl/
-          sudo dpkg -i libjxl_0.11.1_amd64.deb libjxl-dev_0.11.1_amd64.deb
+          sudo dpkg -i libjxl_0.11.2_amd64.deb libjxl-dev_0.11.2_amd64.deb
           sudo ldconfig
           pkg-config --cflags --libs libjxl
 
