@@ -39,6 +39,7 @@ pub fn add_headers_for_caching(
 #[actix_web::get("/{filename:.*}")]
 #[tracing::instrument(skip_all, fields(filename = %filename), level = "debug")]
 #[allow(clippy::too_many_arguments)]
+#[hotpath::measure]
 pub async fn process_image_request(
     req: HttpRequest,
     filename: web::Path<String>,
@@ -277,7 +278,7 @@ pub async fn process_image_request(
                 let _timer = pipeline_duration
                     .with_label_values(&["decode"])
                     .start_timer();
-                image::load_from_memory(&image_bytes)?
+                crate::utils::decode::decode_image(&image_bytes)?
             };
             let bytes = crate::operations::pipeline::image_pipeline(
                 image,

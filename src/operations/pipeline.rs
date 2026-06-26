@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[tracing::instrument(level = "debug", skip_all)]
+#[hotpath::measure]
 pub fn image_pipeline(
     image: DynamicImage,
     size: Option<u32>,

@@ -1,6 +1,7 @@
-mod encoding;
-mod mime;
-mod path;
+pub mod decode;
+pub mod encoding;
+pub mod mime;
+pub mod path;
 
 pub use encoding::jxl_encoder_speed_from_int;
 pub use mime::mime_type_for_format;

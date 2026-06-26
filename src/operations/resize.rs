@@ -28,6 +28,7 @@ impl FromStr for ResizeAlgorithm {
 }
 
 #[tracing::instrument(level = "debug", skip_all, fields(size = ?size, ?algorithm))]
+#[hotpath::measure]
 pub fn resize_image(
     mut image: DynamicImage,
     size: Option<u32>,
@@ -120,10 +121,7 @@ mod tests {
 
     #[test]
     fn from_str_auto() {
-        assert_eq!(
-            ResizeAlgorithm::from_str("auto"),
-            Ok(ResizeAlgorithm::Auto)
-        );
+        assert_eq!(ResizeAlgorithm::from_str("auto"), Ok(ResizeAlgorithm::Auto));
     }
 
     #[test]
@@ -136,10 +134,7 @@ mod tests {
             ResizeAlgorithm::from_str("Thumbnail"),
             Ok(ResizeAlgorithm::Thumbnail)
         );
-        assert_eq!(
-            ResizeAlgorithm::from_str("AUTO"),
-            Ok(ResizeAlgorithm::Auto)
-        );
+        assert_eq!(ResizeAlgorithm::from_str("AUTO"), Ok(ResizeAlgorithm::Auto));
     }
 
     #[test]

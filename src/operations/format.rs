@@ -9,6 +9,7 @@ thread_local! {
 }
 
 #[tracing::instrument(level = "debug", skip_all, fields(format = ?format))]
+#[hotpath::measure]
 pub fn convert_image_format(
     image: DynamicImage,
     format: Option<&str>,

@@ -32,9 +32,13 @@ IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=debug cargo run --release
 cargo run --example bench --release
 cargo run --example bench --release resize-avif
 BENCH_DURATION=5 BENCH_CONCURRENCY=128 cargo run --example bench --release resize-jpeg
+# Profile hot functions (per-function timing + allocation stats on shutdown):
+IMAGE_PROXY_ROOT_PATH="data/images/" RUST_LOG=warn cargo run --release --features hotpath,hotpath-alloc
 ```
 
 Use `--release` for any performance testing — debug AVIF/JXL encoding is extremely slow. See [development docs](docs/content/docs/development.mdx).
+
+**Profiling with `hotpath`**: the `hotpath` feature reports per-function timing and `hotpath-alloc` adds allocation stats; both are opt-in (off by default, zero runtime cost). Functions are instrumented with `#[hotpath::measure]` (e.g. in [src/operations/resize.rs](src/operations/resize.rs), [src/operations/format.rs](src/operations/format.rs), [src/api/image.rs](src/api/image.rs)) and the report is emitted by `#[hotpath::main]` in [src/main.rs](src/main.rs) on shutdown — annotate any new hot function you want measured. Use `hotpath-cpu` for CPU-time instead of wall-clock.
 
 ## Architecture
 

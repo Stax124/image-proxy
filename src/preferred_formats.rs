@@ -1,4 +1,5 @@
 /// Determines the preferred output format based on the configuration, preselected format, file extension, and browser support
+#[hotpath::measure]
 pub fn get_preferred_format(
     config: &crate::config::EncodingConfig,
     preselected_format: Option<String>,
@@ -37,6 +38,7 @@ pub fn get_preferred_format(
 }
 
 /// Parses the Accept header to extract a list of preferred image formats in order of preference
+#[hotpath::measure]
 pub fn extract_preferred_formats_from_accept_header(accept_header: &str) -> Vec<String> {
     // Should be in these formats:
     // We need to extract just the format names (e.g., "avif", "webp", "jxl") and ignore the quality values and other parameters

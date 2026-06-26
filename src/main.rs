@@ -6,12 +6,13 @@ use image_proxy::{
     api::image::process_image_request, api::metrics::metrics_handler, config::EncodingConfig,
 };
 
-
 #[actix_web::main]
+#[hotpath::main]
 async fn main() -> anyhow::Result<()> {
     image_proxy::logs::setup_tracing();
     let config = Arc::new(EncodingConfig::from_env());
-    let (prometheus_registry, pipeline_duration, request_count) = image_proxy::metrics::setup_metrics();
+    let (prometheus_registry, pipeline_duration, request_count) =
+        image_proxy::metrics::setup_metrics();
     let hybrid_cache = image_proxy::cache::setup_cache(&config, &prometheus_registry).await?;
 
     HttpServer::new(move || {
