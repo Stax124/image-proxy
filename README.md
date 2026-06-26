@@ -1,6 +1,8 @@
-# image-proxy
-
-A lightweight HTTP image-serving and transformation proxy written in Rust.
+<div align="center">
+  <h1>image-proxy</h1>
+  <p>A lightweight HTTP image-serving and transformation proxy written in Rust.</p>
+  <a href="https://stax124.github.io/image-proxy/"><strong>Explore the docs »</strong></a>
+</div>
 
 ## Features
 
