@@ -20,7 +20,7 @@ tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 webp = "0.3"
-hotpath = "0.18"
+hotpath = "0.19"
 
 [features]
 hotpath = ["hotpath/hotpath"]
