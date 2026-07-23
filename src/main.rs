@@ -17,6 +17,11 @@ async fn main() -> anyhow::Result<()> {
 
     HttpServer::new(move || {
         let http_client = awc::ClientBuilder::new()
+            // Set global user-agent header for all requests made by this client
+            .add_default_header((
+                awc::http::header::USER_AGENT,
+                image_proxy::utils::resolve_user_agent(),
+            ))
             .timeout(Duration::from_secs(5))
             .finish();
 

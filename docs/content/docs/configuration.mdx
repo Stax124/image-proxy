@@ -8,18 +8,19 @@ All configuration is done through environment variables.
 
 ## Server
 
-| Variable                   | Default        | Description                                                                                         |
-| -------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
-| `IMAGE_PROXY_BIND_ADDRESS` | `0.0.0.0:8000` | TCP address and port to listen on                                                                   |
-| `IMAGE_PROXY_ROOT_PATH`    | `/app/data`    | Root directory for serving image files                                                              |
-| `IMAGE_PROXY_STRIP_PATH`   | *(unset)*      | Path prefix to strip from incoming requests. Useful when behind a reverse proxy that adds a prefix. |
-| `RUST_LOG`                 | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                               |
+| Variable                   | Default                 | Description                                                                                                                          |
+| -------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `IMAGE_PROXY_BIND_ADDRESS` | `0.0.0.0:8000`          | TCP address and port to listen on                                                                                                    |
+| `IMAGE_PROXY_ROOT_PATH`    | `/app/data`             | Root directory for serving image files                                                                                               |
+| `IMAGE_PROXY_STRIP_PATH`   | _(unset)_               | Path prefix to strip from incoming requests. Useful when behind a reverse proxy that adds a prefix.                                  |
+| `IMAGE_PROXY_USER_AGENT`   | `image-proxy/<version>` | `User-Agent` header sent when fetching [fallback images](#fallback) from an upstream. Falls back to the default when unset or empty. |
+| `RUST_LOG`                 | `INFO`                  | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                |
 
 ## Fallback
 
 | Variable                              | Default          | Description                                                                              |
 | ------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `IMAGE_PROXY_FALLBACK_IMAGE_URL`      | *(unset)*        | Base URL for fetching images not found on disk (e.g., `https://cdn.example.com/images/`) |
+| `IMAGE_PROXY_FALLBACK_IMAGE_URL`      | _(unset)_        | Base URL for fetching images not found on disk (e.g., `https://cdn.example.com/images/`) |
 | `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` | `5242880` (5 MB) | Maximum size in bytes for fallback image responses. Prevents excessive memory usage.     |
 
 ## Encoding
@@ -49,8 +50,8 @@ See [Formats](/docs/formats) for details on each format's quality and speed para
 
 | Variable                             | Default   | Description                                                                                                                                                                                                    |
 | ------------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IMAGE_PROXY_PREFERRED_FORMATS`      | *(unset)* | Comma-separated list of preferred output formats for [automatic format selection](/docs/formats#automatic-format-selection) (e.g., `avif,webp`). Leaving this field empty disables automatic format selection. |
-| `IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS` | *(unset)* | Comma-separated list of allowed output formats. Requests for unlisted formats get `415`. When unset, all formats are allowed. Leaving this field empty allows all formats.                                     |
+| `IMAGE_PROXY_PREFERRED_FORMATS`      | _(unset)_ | Comma-separated list of preferred output formats for [automatic format selection](/docs/formats#automatic-format-selection) (e.g., `avif,webp`). Leaving this field empty disables automatic format selection. |
+| `IMAGE_PROXY_ALLOWED_OUTPUT_FORMATS` | _(unset)_ | Comma-separated list of allowed output formats. Requests for unlisted formats get `415`. When unset, all formats are allowed. Leaving this field empty allows all formats.                                     |
 
 ## Caching
 

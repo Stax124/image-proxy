@@ -105,6 +105,25 @@ pub fn build_app_data(config: Arc<EncodingConfig>) -> AppData {
     )
 }
 
+/// Build AppData using a caller-provided HTTP client. Useful for tests that
+/// need the outbound client configured with specific default headers (e.g. a
+/// custom `User-Agent`).
+#[allow(dead_code)]
+pub fn build_app_data_with_client(
+    config: Arc<EncodingConfig>,
+    http_client: awc::Client,
+) -> AppData {
+    let (registry, pipeline_duration, request_count) = setup_metrics();
+    (
+        web::Data::new(config),
+        web::Data::new(http_client),
+        web::Data::new(None),
+        web::Data::new(registry),
+        web::Data::new(pipeline_duration),
+        web::Data::new(request_count),
+    )
+}
+
 /// Build AppData with a real in-memory foyer cache enabled.
 /// Uses the provided config (caller should set enable_cache: true).
 #[allow(dead_code)]
@@ -132,7 +151,9 @@ pub async fn start_simple_http_server(
     data: Vec<u8>,
     content_type: &'static str,
 ) -> (String, tokio::task::JoinHandle<()>) {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind temp http server");
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind temp http server");
     let addr = listener.local_addr().expect("local addr");
     let base = format!("http://{}/", addr);
 
@@ -162,4 +183,77 @@ pub async fn start_simple_http_server(
     });
 
     (base, handle)
+}
+
+/// Like [`start_simple_http_server`], but also captures the `User-Agent`
+/// request header of the first request it receives into the returned shared
+/// slot. Intended for verifying the outbound HTTP client's `User-Agent`.
+/// Returns `(base_url_with_trailing_slash, captured_user_agent, join_handle)`.
+#[allow(dead_code)]
+pub async fn start_user_agent_capturing_server(
+    data: Vec<u8>,
+    content_type: &'static str,
+) -> (
+    String,
+    std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind temp http server");
+    let addr = listener.local_addr().expect("local addr");
+    let base = format!("http://{}/", addr);
+
+    let captured: std::sync::Arc<std::sync::Mutex<Option<String>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+    let captured_for_task = captured.clone();
+
+    let handle = tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = match listener.accept().await {
+                Ok(v) => v,
+                Err(_) => break,
+            };
+
+            // Read the request headers (loop until we see the end of the
+            // header block or hit a small cap, since a single read may be
+            // partial).
+            let mut request = String::new();
+            let mut buf = [0u8; 2048];
+            loop {
+                if socket.readable().await.is_err() {
+                    break;
+                }
+                match socket.try_read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        request.push_str(&String::from_utf8_lossy(&buf[..n]));
+                        if request.contains("\r\n\r\n") || request.len() > 8192 {
+                            break;
+                        }
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+                    Err(_) => break,
+                }
+            }
+            for line in request.lines() {
+                if line.to_ascii_lowercase().starts_with("user-agent:") {
+                    let value = line["User-Agent:".len()..].trim().to_string();
+                    *captured_for_task.lock().unwrap() = Some(value);
+                    break;
+                }
+            }
+
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                content_type,
+                data.len()
+            );
+            let _ = socket.write_all(header.as_bytes()).await;
+            let _ = socket.write_all(&data).await;
+            let _ = socket.flush().await;
+        }
+    });
+
+    (base, captured, handle)
 }

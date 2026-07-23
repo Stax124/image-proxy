@@ -114,15 +114,16 @@ pub async fn process_image_request(
 
     // If user requested an explicit output format, check if it's allowed by configuration, if not, reject the request early before doing any expensive work
     match format_param.as_ref() {
-        Some(fmt)
+        Some(fmt) => {
             if let Some(allowed_formats) = &config.allowed_output_formats
-                && !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt)) =>
-        {
-            request_count
-                .with_label_values(&[fmt.as_str(), "unsupported_media_type"])
-                .inc();
-            return Ok(HttpResponse::UnsupportedMediaType()
-                .body(format!("Requested output format '{}' is not allowed", fmt)));
+                && !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt))
+            {
+                request_count
+                    .with_label_values(&[fmt.as_str(), "unsupported_media_type"])
+                    .inc();
+                return Ok(HttpResponse::UnsupportedMediaType()
+                    .body(format!("Requested output format '{}' is not allowed", fmt)));
+            }
         }
         _ => (),
     }
