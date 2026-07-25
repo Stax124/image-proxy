@@ -23,10 +23,10 @@ GET /metrics
 
 Tracks the total number of image requests, labeled by output format and result status.
 
-| Label | Values |
-| --- | --- |
+| Label    | Values                                                               |
+| -------- | -------------------------------------------------------------------- |
 | `format` | The output image format (e.g., `avif`, `webp`, `jpeg`, `png`, `jxl`) |
-| `status` | `ok`, `not_found`, `unsupported_media_type`, `error` |
+| `status` | `ok`, `not_found`, `unsupported_media_type`, `error`                 |
 
 **Example queries:**
 
@@ -47,9 +47,9 @@ sum(rate(image_requests_total{status="not_found"}[5m])) / sum(rate(image_request
 
 Tracks the duration of each step in the image processing pipeline.
 
-| Label | Values |
-| --- | --- |
-| `step` | `decode`, `resize`, `encode` |
+| Label  | Values                             |
+| ------ | ---------------------------------- |
+| `step` | `decode`, `resize`, `bw`, `encode` |
 
 **Histogram buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
@@ -82,5 +82,5 @@ A basic dashboard can be built with these panels:
 
 1. **Request Rate** — `rate(image_requests_total[5m])` grouped by `format`
 2. **Error Rate** — `rate(image_requests_total{status!="ok"}[5m])` grouped by `status`
-3. **Pipeline Latency** — `histogram_quantile(0.95, ...)` for each step (`decode`, `resize`, `encode`)
+3. **Pipeline Latency** — `histogram_quantile(0.95, ...)` for each step (`decode`, `resize`, `bw`, `encode`)
 4. **Format Distribution** — `sum by (format)(increase(image_requests_total[1h]))`

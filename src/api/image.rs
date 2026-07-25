@@ -111,6 +111,7 @@ pub async fn process_image_request(
     let resize_algorithm_param = query_params
         .get("resize_algorithm")
         .and_then(|s| s.parse::<ResizeAlgorithm>().ok());
+    let bw_param = query_params.get("bw").is_some_and(|s| s == "1");
 
     // If user requested an explicit output format, check if it's allowed by configuration, if not, reject the request early before doing any expensive work
     if let Some(fmt) = format_param.as_ref()
@@ -138,27 +139,36 @@ pub async fn process_image_request(
 
     // Build a cache key from the path and transformation parameters
     let cache_key = format!(
-        "{}?format={}&size={}&resize={}&dpr={}",
+        "{}?format={}&size={}&resize={}&dpr={}&bw={}",
         sanitized_path.display(),
         effective_format,
         size_param.map_or_else(|| "".to_string(), |s| s.to_string()),
         resize_algorithm_param.map_or_else(|| "".to_string(), |r| format!("{:?}", r)),
         dpr_param.map_or_else(|| "".to_string(), |d| format!("{:.2}", d)),
+        bw_param,
     );
 
     // Check cache for a hit before doing any expensive work
-    if let Some(cache) = cache.get_ref()
-        && let Ok(Some(entry)) = cache.get(&cache_key).await
-    {
-        tracing::debug!(cache_key = %cache_key, "cache hit");
-        request_count
-            .with_label_values(&[effective_format.as_str(), "ok"])
-            .inc();
-        let mut builder = HttpResponse::Ok();
-        builder.content_type(content_type);
-        builder.insert_header((config.cache_status_header.clone(), "HIT"));
-        add_headers_for_caching(&mut builder, &config);
-        return Ok(builder.body(entry.value().clone()));
+    if let Some(cache) = cache.get_ref() {
+        match cache.get(&cache_key).await {
+            Ok(Some(entry)) => {
+                tracing::debug!(cache_key = %cache_key, "cache hit");
+                request_count
+                    .with_label_values(&[effective_format.as_str(), "ok"])
+                    .inc();
+                let mut builder = HttpResponse::Ok();
+                builder.content_type(content_type);
+                builder.insert_header((config.cache_status_header.clone(), "HIT"));
+                add_headers_for_caching(&mut builder, &config);
+                return Ok(builder.body(entry.value().clone()));
+            }
+            Ok(None) => {
+                tracing::debug!(cache_key = %cache_key, "cache miss");
+            }
+            Err(e) => {
+                tracing::warn!(cache_key = %cache_key, error = %e, "cache lookup failed");
+            }
+        }
     }
 
     // Stream local files directly when no transformation is requested.
@@ -283,6 +293,7 @@ pub async fn process_image_request(
                 &effective_format_clone,
                 config_for_pipeline.get_ref(),
                 resize_algorithm_param,
+                bw_param,
                 Some(&pipeline_duration),
             )?;
             Ok(bytes)
@@ -299,6 +310,7 @@ pub async fn process_image_request(
 
     // Store the transformed result in cache
     if let Some(cache) = cache.get_ref() {
+        tracing::debug!(cache_key = %cache_key, "storing in cache");
         cache.insert(cache_key, image_bytes.clone());
     }
 

@@ -5,6 +5,7 @@ use crate::{
     config::EncodingConfig,
     operations::{
         format::convert_image_format,
+        grayscale::apply_bw,
         resize::{ResizeAlgorithm, resize_image},
     },
 };
@@ -17,11 +18,17 @@ pub fn image_pipeline(
     format: &str,
     config: &EncodingConfig,
     resize_algorithm: Option<ResizeAlgorithm>,
+    black_and_white: bool,
     pipeline_duration: Option<&HistogramVec>,
 ) -> anyhow::Result<Vec<u8>> {
     let image = {
         let _timer = pipeline_duration.map(|h| h.with_label_values(&["resize"]).start_timer());
         resize_image(image, size, resize_algorithm, config)
+    };
+
+    let image = {
+        let _timer = pipeline_duration.map(|h| h.with_label_values(&["bw"]).start_timer());
+        apply_bw(image, black_and_white)
     };
 
     let _timer = pipeline_duration.map(|h| h.with_label_values(&["encode"]).start_timer());

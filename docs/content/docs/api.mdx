@@ -20,6 +20,7 @@ Serves an image from the configured root path, optionally applying transformatio
 | `size`             | `u32`    | Maximum bounding-box dimension in pixels. Maintains aspect ratio. Does not upscale.  |
 | `dpr`              | `f64`    | Device pixel ratio (1.0–10.0). Multiplies `size` to produce actual output dimension. |
 | `resize_algorithm` | `string` | Resize algorithm override: `lanczos3`, `thumbnail`, `auto`                           |
+| `bw`               | `0`/`1`  | Convert to black-and-white via luminance grayscale. Only `1` enables; other values leave color. |
 
 ### Request Headers
 
@@ -65,6 +66,9 @@ curl http://localhost:8000/photo.jpg?size=400&format=avif&dpr=2
 # Override resize algorithm
 curl http://localhost:8000/photo.jpg?size=400&resize_algorithm=lanczos3
 
+# Black-and-white (luminance grayscale)
+curl http://localhost:8000/photo.jpg?bw=1
+
 # Use Sec-CH-DPR header instead of query param
 curl -H "Sec-CH-DPR: 2.0" http://localhost:8000/photo.jpg?size=400
 ```
@@ -73,7 +77,7 @@ curl -H "Sec-CH-DPR: 2.0" http://localhost:8000/photo.jpg?size=400
 
 - **No transformation parameters** — The raw file is streamed directly without decoding or re-encoding.
 - **Non-processable format** (SVG, ICO, GIF, BMP, TIFF, JXL) — The file is served as-is without processing, even if transformation parameters are present.
-- **With transformations** — The image is decoded, processed through the pipeline (resize → encode), and the result is cached if caching is enabled.
+- **With transformations** — The image is decoded, processed through the pipeline and the result is cached if caching is enabled.
 - **File not found + fallback URL** — The image is fetched from the configured `IMAGE_PROXY_FALLBACK_IMAGE_URL`, transformed, and served. The response size is capped by `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE`.
 - **File not found + no fallback** — Returns `404 Not Found`.
 

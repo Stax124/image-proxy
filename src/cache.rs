@@ -10,10 +10,17 @@ pub async fn setup_cache(
     prometheus_registry: &prometheus::Registry,
 ) -> anyhow::Result<Option<foyer::HybridCache<String, Bytes>>> {
     if !config.enable_cache {
+        tracing::debug!("caching is disabled, skipping cache setup");
         return Ok(None);
     }
 
     if config.enable_disk_cache {
+        tracing::debug!(
+            "setting up hybrid cache with memory size {} bytes and disk size {} bytes at path {}",
+            config.cache_memory_size,
+            config.cache_disk_size,
+            config.cache_disk_path
+        );
         let dev = FsDeviceBuilder::new(&config.cache_disk_path)
             .with_capacity(config.cache_disk_size)
             .build()?;
@@ -35,6 +42,10 @@ pub async fn setup_cache(
 
         Ok(Some(hybrid_cache))
     } else {
+        tracing::debug!(
+            "setting up memory-only cache with size {} bytes",
+            config.cache_memory_size
+        );
         let cache_memory_max_item_size = config.cache_memory_max_item_size;
         let hybrid_cache = HybridCacheBuilder::new()
             .with_metrics_registry(Box::new(PrometheusMetricsRegistry::new(

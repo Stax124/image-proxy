@@ -9,7 +9,7 @@ image-proxy includes a hybrid cache powered by [foyer](https://github.com/foyer-
 ## When Caching Applies
 
 - **Requests without transformations** are streamed directly from disk and **not cached** — there's no benefit to caching raw file bytes.
-- **Requests with transformations** (resize, format conversion) go through the decode → resize → encode pipeline. The result is cached to avoid repeating expensive operations.
+- **Requests with transformations** (resize, format conversion, black-and-white) go through the decode → resize → optional B&W → encode pipeline. The result is cached to avoid repeating expensive operations.
 
 The `X-Image-Proxy-Cache` response header indicates whether the response was served from cache:
 - `X-Image-Proxy-Cache: HIT` — Served from cache
