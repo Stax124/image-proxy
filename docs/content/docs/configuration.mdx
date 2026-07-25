@@ -10,18 +10,18 @@ All configuration is done through environment variables.
 
 | Variable                   | Default                 | Description                                                                                                                          |
 | -------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `IMAGE_PROXY_BIND_ADDRESS` | `0.0.0.0:8000`          | TCP address and port to listen on                                                                                                    |
-| `IMAGE_PROXY_ROOT_PATH`    | `/app/data`             | Root directory for serving image files                                                                                               |
-| `IMAGE_PROXY_STRIP_PATH`   | _(unset)_               | Path prefix to strip from incoming requests. Useful when behind a reverse proxy that adds a prefix.                                  |
-| `IMAGE_PROXY_USER_AGENT`   | `image-proxy/<version>` | `User-Agent` header sent when fetching [fallback images](#fallback) from an upstream. Falls back to the default when unset or empty. |
-| `RUST_LOG`                 | `INFO`                  | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                                                                |
+| `IMAGE_PROXY_BIND_ADDRESS` | `0.0.0.0:8000` | TCP address and port to listen on                                                                   |
+| `IMAGE_PROXY_ROOT_PATH`    | `/app/data`    | Root directory for serving image files                                                              |
+| `IMAGE_PROXY_STRIP_PATH`   | _(unset)_      | Path prefix to strip from incoming requests. Useful when behind a reverse proxy that adds a prefix. |
+| `RUST_LOG`                 | `INFO`         | Log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)                                               |
 
 ## Fallback
 
-| Variable                              | Default          | Description                                                                              |
-| ------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| `IMAGE_PROXY_FALLBACK_IMAGE_URL`      | _(unset)_        | Base URL for fetching images not found on disk (e.g., `https://cdn.example.com/images/`) |
-| `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` | `5242880` (5 MB) | Maximum size in bytes for fallback image responses. Prevents excessive memory usage.     |
+| Variable                              | Default                 | Description                                                                                                                                  |
+| ------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMAGE_PROXY_FALLBACK_IMAGE_URL`      | _(unset)_               | Base URL for fetching images not found on disk (e.g., `https://cdn.example.com/images/`)                                                     |
+| `IMAGE_PROXY_FALLBACK_IMAGE_MAX_SIZE` | `5242880` (5 MB)        | Maximum size in bytes for fallback image responses. Prevents excessive memory usage.                                                         |
+| `IMAGE_PROXY_USER_AGENT`              | `image-proxy/<version>` | `User-Agent` header sent when fetching fallback images from an upstream. Loaded into `EncodingConfig`; empty/whitespace falls back to default. |
 
 ## Encoding
 

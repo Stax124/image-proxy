@@ -37,6 +37,8 @@ pub struct EncodingConfig {
     // Fallback image configuration
     pub fallback_image_url: Option<String>,
     pub fallback_image_max_size: usize,
+    /// `User-Agent` sent on outbound fallback image fetches
+    pub user_agent: String,
 
     // Cache configuration
     /// Whether to enable caching at all
@@ -118,6 +120,9 @@ impl EncodingConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(5 * 1024 * 1024), // Default to 5 MB
+            user_agent: crate::utils::user_agent_from_override(
+                std::env::var(crate::utils::USER_AGENT_ENV).ok(),
+            ),
             enable_cache: std::env::var("IMAGE_PROXY_ENABLE_CACHE")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -173,6 +178,7 @@ impl Default for EncodingConfig {
             strip_path: None,
             fallback_image_url: None,
             fallback_image_max_size: 5 * 1024 * 1024,
+            user_agent: crate::utils::default_user_agent(),
             cache_status_header: "X-Image-Proxy-Cache".to_string(),
             enable_cache: false,
             cache_memory_size: 100 * 1024 * 1024,

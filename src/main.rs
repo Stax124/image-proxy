@@ -1,9 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use actix_web::{App, HttpServer, middleware, web};
 
 use image_proxy::{
     api::image::process_image_request, api::metrics::metrics_handler, config::EncodingConfig,
+    utils::build_http_client,
 };
 
 #[actix_web::main]
@@ -16,14 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let hybrid_cache = image_proxy::cache::setup_cache(&config, &prometheus_registry).await?;
 
     HttpServer::new(move || {
-        let http_client = awc::ClientBuilder::new()
-            // Set global user-agent header for all requests made by this client
-            .add_default_header((
-                awc::http::header::USER_AGENT,
-                image_proxy::utils::resolve_user_agent(),
-            ))
-            .timeout(Duration::from_secs(5))
-            .finish();
+        let http_client = build_http_client(&config.user_agent);
 
         App::new()
             .app_data(web::Data::new(http_client))

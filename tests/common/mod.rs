@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use actix_web::web;
 use image_proxy::{config::EncodingConfig, metrics::setup_metrics};
@@ -8,15 +8,31 @@ use tokio::net::TcpListener;
 #[allow(unused_macros)]
 macro_rules! init_test_app {
     ($config:expr) => {{
-        let (cfg, client, cache, reg, pd, rc) = common::build_app_data($config);
+        let (cfg, client, cache, registry, pipeline_duration, request_count) =
+            common::build_app_data($config);
         ::actix_web::test::init_service(
             ::actix_web::App::new()
                 .app_data(cfg)
                 .app_data(client)
                 .app_data(cache)
-                .app_data(reg)
-                .app_data(pd)
-                .app_data(rc)
+                .app_data(registry)
+                .app_data(pipeline_duration)
+                .app_data(request_count)
+                .service(::image_proxy::api::image::process_image_request),
+        )
+        .await
+    }};
+    ($config:expr, $client:expr) => {{
+        let (cfg, client, cache, registry, pipeline_duration, request_count) =
+            common::build_app_data_with_client($config, $client);
+        ::actix_web::test::init_service(
+            ::actix_web::App::new()
+                .app_data(cfg)
+                .app_data(client)
+                .app_data(cache)
+                .app_data(registry)
+                .app_data(pipeline_duration)
+                .app_data(request_count)
                 .service(::image_proxy::api::image::process_image_request),
         )
         .await
@@ -93,16 +109,7 @@ pub type AppData = (
 
 #[allow(dead_code)]
 pub fn build_app_data(config: Arc<EncodingConfig>) -> AppData {
-    let (registry, pipeline_duration, request_count) = setup_metrics();
-    let http_client = awc::Client::default();
-    (
-        web::Data::new(config),
-        web::Data::new(http_client),
-        web::Data::new(None),
-        web::Data::new(registry),
-        web::Data::new(pipeline_duration),
-        web::Data::new(request_count),
-    )
+    build_app_data_with_client(config, awc::Client::default())
 }
 
 /// Build AppData using a caller-provided HTTP client. Useful for tests that
@@ -143,13 +150,15 @@ pub async fn build_app_data_with_cache(config: Arc<EncodingConfig>) -> AppData {
     )
 }
 
-/// Start a minimal HTTP/1.1 server on a random localhost port that responds to every GET
-/// with the supplied bytes and Content-Type. Intended only for fallback_image_url tests.
-/// Returns (base_url_with_trailing_slash, join_handle). The task runs until the test ends.
-#[allow(dead_code)]
-pub async fn start_simple_http_server(
+/// Shared minimal HTTP/1.1 test server on a random localhost port.
+///
+/// Responds to every request with the supplied body and Content-Type.
+/// When `captured_user_agent` is `Some`, the first request's `User-Agent`
+/// header (if present) is stored in that slot.
+async fn start_test_http_server(
     data: Vec<u8>,
     content_type: &'static str,
+    captured_user_agent: Option<Arc<Mutex<Option<String>>>>,
 ) -> (String, tokio::task::JoinHandle<()>) {
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
@@ -164,60 +173,8 @@ pub async fn start_simple_http_server(
                 Err(_) => break,
             };
 
-            // Read (and ignore) the request headers minimally.
-            let mut buf = [0u8; 1024];
-            let _ = socket.readable().await;
-            let _ = socket.try_read(&mut buf);
-
-            // Write a minimal HTTP response.
-            let header = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                content_type,
-                data.len()
-            );
-            let _ = socket.write_all(header.as_bytes()).await;
-            let _ = socket.write_all(&data).await;
-            let _ = socket.flush().await;
-            // Drop closes the connection.
-        }
-    });
-
-    (base, handle)
-}
-
-/// Like [`start_simple_http_server`], but also captures the `User-Agent`
-/// request header of the first request it receives into the returned shared
-/// slot. Intended for verifying the outbound HTTP client's `User-Agent`.
-/// Returns `(base_url_with_trailing_slash, captured_user_agent, join_handle)`.
-#[allow(dead_code)]
-pub async fn start_user_agent_capturing_server(
-    data: Vec<u8>,
-    content_type: &'static str,
-) -> (
-    String,
-    std::sync::Arc<std::sync::Mutex<Option<String>>>,
-    tokio::task::JoinHandle<()>,
-) {
-    let listener = TcpListener::bind(("127.0.0.1", 0))
-        .await
-        .expect("bind temp http server");
-    let addr = listener.local_addr().expect("local addr");
-    let base = format!("http://{}/", addr);
-
-    let captured: std::sync::Arc<std::sync::Mutex<Option<String>>> =
-        std::sync::Arc::new(std::sync::Mutex::new(None));
-    let captured_for_task = captured.clone();
-
-    let handle = tokio::spawn(async move {
-        loop {
-            let (mut socket, _) = match listener.accept().await {
-                Ok(v) => v,
-                Err(_) => break,
-            };
-
-            // Read the request headers (loop until we see the end of the
-            // header block or hit a small cap, since a single read may be
-            // partial).
+            // Read request headers (loop until end of header block or a small
+            // cap — a single read may be partial).
             let mut request = String::new();
             let mut buf = [0u8; 2048];
             loop {
@@ -236,11 +193,14 @@ pub async fn start_user_agent_capturing_server(
                     Err(_) => break,
                 }
             }
-            for line in request.lines() {
-                if line.to_ascii_lowercase().starts_with("user-agent:") {
-                    let value = line["User-Agent:".len()..].trim().to_string();
-                    *captured_for_task.lock().unwrap() = Some(value);
-                    break;
+
+            if let Some(ref slot) = captured_user_agent {
+                for line in request.lines() {
+                    if line.to_ascii_lowercase().starts_with("user-agent:") {
+                        let user_agent = line["User-Agent:".len()..].trim().to_string();
+                        *slot.lock().unwrap() = Some(user_agent);
+                        break;
+                    }
                 }
             }
 
@@ -255,5 +215,35 @@ pub async fn start_user_agent_capturing_server(
         }
     });
 
-    (base, captured, handle)
+    (base, handle)
+}
+
+/// Start a minimal HTTP/1.1 server on a random localhost port that responds to every GET
+/// with the supplied bytes and Content-Type. Intended only for fallback_image_url tests.
+/// Returns (base_url_with_trailing_slash, join_handle). The task runs until the test ends.
+#[allow(dead_code)]
+pub async fn start_simple_http_server(
+    data: Vec<u8>,
+    content_type: &'static str,
+) -> (String, tokio::task::JoinHandle<()>) {
+    start_test_http_server(data, content_type, None).await
+}
+
+/// Like [`start_simple_http_server`], but also captures the `User-Agent`
+/// request header of the first request it receives into the returned shared
+/// slot. Intended for verifying the outbound HTTP client's `User-Agent`.
+/// Returns `(base_url_with_trailing_slash, captured_user_agent, join_handle)`.
+#[allow(dead_code)]
+pub async fn start_user_agent_capturing_server(
+    data: Vec<u8>,
+    content_type: &'static str,
+) -> (
+    String,
+    Arc<Mutex<Option<String>>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let captured_user_agent = Arc::new(Mutex::new(None));
+    let (base, handle) =
+        start_test_http_server(data, content_type, Some(captured_user_agent.clone())).await;
+    (base, captured_user_agent, handle)
 }
