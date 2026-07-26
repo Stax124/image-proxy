@@ -9,6 +9,8 @@ pub enum ResizeAlgorithm {
     Lanczos3,
     /// Fast thumbnail (box/nearest) resampling.
     Thumbnail,
+    /// Cubic (Catmull-Rom) resampling — good quality/speed tradeoff vs Lanczos3.
+    Bicubic,
     /// Choose automatically: use `Thumbnail` for large downscales (< 50 % of
     /// the original longest edge), otherwise `Lanczos3`.
     Auto,
@@ -21,6 +23,7 @@ impl FromStr for ResizeAlgorithm {
         match s.to_ascii_lowercase().as_str() {
             "lanczos3" => Ok(Self::Lanczos3),
             "thumbnail" => Ok(Self::Thumbnail),
+            "bicubic" => Ok(Self::Bicubic),
             "auto" => Ok(Self::Auto),
             _ => Err(()),
         }
@@ -68,23 +71,36 @@ pub fn resize_image(
         algorithm
     );
 
-    // Resize the image while maintaining aspect ratio
-    match algorithm {
-        ResizeAlgorithm::Lanczos3 => {
-            let aspect_ratio = image.width() as f64 / image.height() as f64;
-            let (new_width, new_height) = if aspect_ratio > 1.0 {
-                // Landscape orientation
-                (size, (size as f64 / aspect_ratio).round() as u32)
-            } else {
-                // Portrait orientation
-                ((size as f64 * aspect_ratio).round() as u32, size)
-            };
-
-            image.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3);
+    // Resize the image while maintaining aspect ratio.
+    // Auto is resolved above; Thumbnail has no FilterType and uses a separate path.
+    match filter_type(algorithm) {
+        Some(filter) => {
+            let (new_width, new_height) = target_dimensions(image.width(), image.height(), size);
+            image.resize_exact(new_width, new_height, filter);
             image
         }
-        ResizeAlgorithm::Thumbnail => image.thumbnail(size, size),
-        ResizeAlgorithm::Auto => unreachable!(), // Already handled above
+        None => image.thumbnail(size, size),
+    }
+}
+
+/// Map algorithms that use `resize_exact` to a filter; `Thumbnail`/`Auto` have none.
+fn filter_type(algorithm: ResizeAlgorithm) -> Option<image::imageops::FilterType> {
+    match algorithm {
+        ResizeAlgorithm::Lanczos3 => Some(image::imageops::FilterType::Lanczos3),
+        ResizeAlgorithm::Bicubic => Some(image::imageops::FilterType::CatmullRom),
+        ResizeAlgorithm::Thumbnail | ResizeAlgorithm::Auto => None,
+    }
+}
+
+/// Fit `size` as the longest edge while preserving aspect ratio.
+fn target_dimensions(width: u32, height: u32, size: u32) -> (u32, u32) {
+    let aspect_ratio = width as f64 / height as f64;
+    if aspect_ratio > 1.0 {
+        // Landscape orientation
+        (size, (size as f64 / aspect_ratio).round() as u32)
+    } else {
+        // Portrait orientation (and square)
+        ((size as f64 * aspect_ratio).round() as u32, size)
     }
 }
 
@@ -125,6 +141,14 @@ mod tests {
     }
 
     #[test]
+    fn from_str_bicubic() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("bicubic"),
+            Ok(ResizeAlgorithm::Bicubic)
+        );
+    }
+
+    #[test]
     fn from_str_case_insensitive() {
         assert_eq!(
             ResizeAlgorithm::from_str("LANCZOS3"),
@@ -134,6 +158,10 @@ mod tests {
             ResizeAlgorithm::from_str("Thumbnail"),
             Ok(ResizeAlgorithm::Thumbnail)
         );
+        assert_eq!(
+            ResizeAlgorithm::from_str("Bicubic"),
+            Ok(ResizeAlgorithm::Bicubic)
+        );
         assert_eq!(ResizeAlgorithm::from_str("AUTO"), Ok(ResizeAlgorithm::Auto));
     }
 
@@ -142,6 +170,23 @@ mod tests {
         assert_eq!(ResizeAlgorithm::from_str(""), Err(()));
         assert_eq!(ResizeAlgorithm::from_str("bilinear"), Err(()));
         assert_eq!(ResizeAlgorithm::from_str("nearest"), Err(()));
+    }
+
+    // --- target_dimensions ---
+
+    #[test]
+    fn target_dimensions_landscape() {
+        assert_eq!(target_dimensions(1000, 500, 400), (400, 200));
+    }
+
+    #[test]
+    fn target_dimensions_portrait() {
+        assert_eq!(target_dimensions(500, 1000, 400), (200, 400));
+    }
+
+    #[test]
+    fn target_dimensions_square() {
+        assert_eq!(target_dimensions(800, 800, 200), (200, 200));
     }
 
     // --- resize_image ---
@@ -199,6 +244,26 @@ mod tests {
         let img = make_image(500, 1000);
         let config = test_config();
         let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Lanczos3), &config);
+
+        assert_eq!(result.height(), 400);
+        assert_eq!(result.width(), 200);
+    }
+
+    #[test]
+    fn resize_bicubic_landscape() {
+        let img = make_image(1000, 500);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Bicubic), &config);
+
+        assert_eq!(result.width(), 400);
+        assert_eq!(result.height(), 200);
+    }
+
+    #[test]
+    fn resize_bicubic_portrait() {
+        let img = make_image(500, 1000);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Bicubic), &config);
 
         assert_eq!(result.height(), 400);
         assert_eq!(result.width(), 200);
