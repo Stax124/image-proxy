@@ -26,15 +26,14 @@ async fn cache_miss_then_hit_for_transformed_request() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("photo.jpeg"), make_test_jpeg_bytes(32, 32)).unwrap();
 
-    let (cfg, client, cache, reg, pd, rc) = make_cached_data(dir.path().to_str().unwrap()).await;
+    let (cfg, client, cache, reg, metrics) = make_cached_data(dir.path().to_str().unwrap()).await;
     let app = test::init_service(
         App::new()
             .app_data(cfg)
             .app_data(client)
             .app_data(cache)
             .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
+            .app_data(metrics)
             .service(image_proxy::api::image::process_image_request),
     )
     .await;
@@ -74,15 +73,14 @@ async fn cache_different_params_produce_different_entries() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("photo.jpeg"), make_test_jpeg_bytes(32, 32)).unwrap();
 
-    let (cfg, client, cache, reg, pd, rc) = make_cached_data(dir.path().to_str().unwrap()).await;
+    let (cfg, client, cache, reg, metrics) = make_cached_data(dir.path().to_str().unwrap()).await;
     let app = test::init_service(
         App::new()
             .app_data(cfg)
             .app_data(client)
             .app_data(cache)
             .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
+            .app_data(metrics)
             .service(image_proxy::api::image::process_image_request),
     )
     .await;
@@ -140,15 +138,14 @@ async fn cache_bw_param_produces_separate_entries() {
     .unwrap();
     std::fs::write(dir.path().join("red.png"), &buf).unwrap();
 
-    let (cfg, client, cache, reg, pd, rc) = make_cached_data(dir.path().to_str().unwrap()).await;
+    let (cfg, client, cache, reg, metrics) = make_cached_data(dir.path().to_str().unwrap()).await;
     let app = test::init_service(
         App::new()
             .app_data(cfg)
             .app_data(client)
             .app_data(cache)
             .app_data(reg)
-            .app_data(pd)
-            .app_data(rc)
+            .app_data(metrics)
             .service(image_proxy::api::image::process_image_request),
     )
     .await;

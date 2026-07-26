@@ -8,22 +8,20 @@ use tokio::net::TcpListener;
 #[allow(unused_macros)]
 macro_rules! init_test_app {
     ($config:expr) => {{
-        let (cfg, client, cache, registry, pipeline_duration, request_count) =
-            common::build_app_data($config);
+        let (cfg, client, cache, registry, app_metrics) = common::build_app_data($config);
         ::actix_web::test::init_service(
             ::actix_web::App::new()
                 .app_data(cfg)
                 .app_data(client)
                 .app_data(cache)
                 .app_data(registry)
-                .app_data(pipeline_duration)
-                .app_data(request_count)
+                .app_data(app_metrics)
                 .service(::image_proxy::api::image::process_image_request),
         )
         .await
     }};
     ($config:expr, $client:expr) => {{
-        let (cfg, client, cache, registry, pipeline_duration, request_count) =
+        let (cfg, client, cache, registry, app_metrics) =
             common::build_app_data_with_client($config, $client);
         ::actix_web::test::init_service(
             ::actix_web::App::new()
@@ -31,8 +29,7 @@ macro_rules! init_test_app {
                 .app_data(client)
                 .app_data(cache)
                 .app_data(registry)
-                .app_data(pipeline_duration)
-                .app_data(request_count)
+                .app_data(app_metrics)
                 .service(::image_proxy::api::image::process_image_request),
         )
         .await
@@ -103,8 +100,7 @@ pub type AppData = (
     web::Data<awc::Client>,
     web::Data<Option<foyer::HybridCache<String, bytes::Bytes>>>,
     web::Data<prometheus::Registry>,
-    web::Data<prometheus::HistogramVec>,
-    web::Data<prometheus::IntCounterVec>,
+    web::Data<image_proxy::metrics::AppMetrics>,
 );
 
 #[allow(dead_code)]
@@ -120,14 +116,13 @@ pub fn build_app_data_with_client(
     config: Arc<EncodingConfig>,
     http_client: awc::Client,
 ) -> AppData {
-    let (registry, pipeline_duration, request_count) = setup_metrics();
+    let (registry, app_metrics) = setup_metrics();
     (
         web::Data::new(config),
         web::Data::new(http_client),
         web::Data::new(None),
         web::Data::new(registry),
-        web::Data::new(pipeline_duration),
-        web::Data::new(request_count),
+        web::Data::new(app_metrics),
     )
 }
 
@@ -135,7 +130,7 @@ pub fn build_app_data_with_client(
 /// Uses the provided config (caller should set enable_cache: true).
 #[allow(dead_code)]
 pub async fn build_app_data_with_cache(config: Arc<EncodingConfig>) -> AppData {
-    let (registry, pipeline_duration, request_count) = setup_metrics();
+    let (registry, app_metrics) = setup_metrics();
     let http_client = awc::Client::default();
     let hybrid_cache = image_proxy::cache::setup_cache(&config, &registry)
         .await
@@ -145,8 +140,7 @@ pub async fn build_app_data_with_cache(config: Arc<EncodingConfig>) -> AppData {
         web::Data::new(http_client),
         web::Data::new(hybrid_cache),
         web::Data::new(registry),
-        web::Data::new(pipeline_duration),
-        web::Data::new(request_count),
+        web::Data::new(app_metrics),
     )
 }
 

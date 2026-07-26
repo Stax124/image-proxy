@@ -14,7 +14,7 @@ image = { version = "*", features = ["nasm", "avif-native"] }
 jpegxl-rs = { version = "=0.14.0+libjxl-0.11.2" }
 jpegxl-sys = { version = "=0.12.1+libjxl-0.11.2" }
 mixtrics = { version = "0.2", features = ["prometheus"] }
-prometheus = "0.14"
+prometheus = { version = "0.14", features = ["process"] }
 tokio = { version = "1.51", features = ["full"] }
 tokio-util = "0.7"
 tracing = "0.1"

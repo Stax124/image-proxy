@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
         ..EncodingConfig::default()
     });
 
-    let (prometheus_registry, pipeline_duration, request_count) = setup_metrics();
+    let (prometheus_registry, app_metrics) = setup_metrics();
 
     let hybrid_cache: Option<foyer::HybridCache<String, Bytes>> = if enable_cache {
         image_proxy::cache::setup_cache(&config, &prometheus_registry).await?
@@ -95,8 +95,7 @@ async fn main() -> anyhow::Result<()> {
     // --- Build server (modeled directly after main.rs) ---
     let config_for_server = config.clone();
     let registry_for_server = prometheus_registry.clone();
-    let pd_for_server = pipeline_duration.clone();
-    let rc_for_server = request_count.clone();
+    let metrics_for_server = app_metrics.clone();
     let cache_for_server = hybrid_cache.clone();
 
     let server = HttpServer::new(move || {
@@ -110,8 +109,7 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(config_for_server.clone()))
             .app_data(web::Data::new(cache_for_server.clone()))
             .app_data(web::Data::new(registry_for_server.clone()))
-            .app_data(web::Data::new(pd_for_server.clone()))
-            .app_data(web::Data::new(rc_for_server.clone()))
+            .app_data(web::Data::new(metrics_for_server.clone()))
             // Logger intentionally omitted for clean benchmark output and lower noise.
             // Production (main.rs) includes it.
             .service(metrics_handler)

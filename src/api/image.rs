@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     config::EncodingConfig,
+    metrics::{AppMetrics, RejectFormat, RequestPath, RequestStatus, RequestTracker},
     operations::resize::ResizeAlgorithm,
     preferred_formats::get_preferred_format,
     utils::{
@@ -12,7 +13,6 @@ use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use bytes::Bytes;
 use foyer::HybridCache;
 use futures_util::TryStreamExt;
-use prometheus::{HistogramVec, IntCounterVec};
 use tokio_util::io::ReaderStream;
 
 /// List of formats that we allow through, but we cannot process them. Developers should only mount image directories to
@@ -47,9 +47,11 @@ pub async fn process_image_request(
     config: web::Data<Arc<EncodingConfig>>,
     http_client: web::Data<awc::Client>,
     cache: web::Data<Option<HybridCache<String, Bytes>>>,
-    pipeline_duration: web::Data<HistogramVec>,
-    request_count: web::Data<IntCounterVec>,
+    metrics: web::Data<AppMetrics>,
 ) -> actix_web::Result<HttpResponse> {
+    // Records count, duration, bytes, and in-flight on drop — every terminal path is counted.
+    let mut tracker = RequestTracker::new(metrics.get_ref().clone());
+
     let (sanitized_path, sanitized_disk_path, ext) = match sanitize_and_validate_path(
         &filename,
         config.strip_path.as_deref(),
@@ -58,22 +60,22 @@ pub async fn process_image_request(
     ) {
         Ok(result) => result,
         Err(PathValidationError::MissingExtension) => {
-            request_count
-                .with_label_values(&["unknown", "unsupported_media_type"])
-                .inc();
+            tracker.reject(RejectFormat::Unknown, RequestStatus::UnsupportedMediaType);
             return Ok(
                 HttpResponse::UnsupportedMediaType().body("Missing or unsupported file format")
             );
         }
         Err(PathValidationError::UnsupportedFormat(ext)) => {
-            request_count
-                .with_label_values(&[ext.as_str(), "unsupported_media_type"])
-                .inc();
+            // Metric format is a closed sentinel; keep the real extension only in the body/logs.
+            tracing::debug!(ext = %ext, "unsupported file format");
+            tracker.reject(RejectFormat::Unsupported, RequestStatus::UnsupportedMediaType);
             return Ok(HttpResponse::UnsupportedMediaType()
                 .body(format!("Unsupported file format: {}", ext)));
         }
     };
     let file_ext = Some(ext.clone());
+    // Known once ext is validated; used for load-error labels and final path.
+    let is_non_processable = NON_PROCESSABLE_FORMATS.contains(&ext.as_str());
 
     // Special headers that can influence processing
     let sec_ch_dpr = req
@@ -118,9 +120,9 @@ pub async fn process_image_request(
         && let Some(allowed_formats) = &config.allowed_output_formats
         && !allowed_formats.iter().any(|f| f.eq_ignore_ascii_case(fmt))
     {
-        request_count
-            .with_label_values(&[fmt.as_str(), "unsupported_media_type"])
-            .inc();
+        // Metric format is a closed sentinel; keep the requested value only in the body/logs.
+        tracing::debug!(requested_format = %fmt, "requested output format not allowed");
+        tracker.reject(RejectFormat::Unsupported, RequestStatus::UnsupportedMediaType);
         return Ok(HttpResponse::UnsupportedMediaType()
             .body(format!("Requested output format '{}' is not allowed", fmt)));
     }
@@ -135,6 +137,7 @@ pub async fn process_image_request(
             .and_then(|v| v.to_str().ok())
             .unwrap_or(""),
     );
+    tracker.set_format(effective_format.clone());
     let content_type = mime_type_for_format(Some(effective_format.as_str()));
 
     // Build a cache key from the path and transformation parameters
@@ -153,14 +156,13 @@ pub async fn process_image_request(
         match cache.get(&cache_key).await {
             Ok(Some(entry)) => {
                 tracing::debug!(cache_key = %cache_key, "cache hit");
-                request_count
-                    .with_label_values(&[effective_format.as_str(), "ok"])
-                    .inc();
+                let body = entry.value().clone();
+                tracker.ok(RequestPath::CacheHit, body.len() as u64);
                 let mut builder = HttpResponse::Ok();
                 builder.content_type(content_type);
                 builder.insert_header((config.cache_status_header.clone(), "HIT"));
                 add_headers_for_caching(&mut builder, &config);
-                return Ok(builder.body(entry.value().clone()));
+                return Ok(builder.body(body));
             }
             Ok(None) => {
                 tracing::debug!(cache_key = %cache_key, "cache miss");
@@ -182,9 +184,7 @@ pub async fn process_image_request(
             .await
             .map_err(|e| {
                 tracing::error!("Failed to read file metadata: {}", e);
-                request_count
-                    .with_label_values(&[ext.as_str(), "error"])
-                    .inc();
+                tracker.fail(RequestPath::PassThrough, RequestStatus::Error);
                 actix_web::error::ErrorInternalServerError("Failed to read file metadata")
             })?;
         let size = metadata.len();
@@ -193,14 +193,12 @@ pub async fn process_image_request(
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open file: {}", e);
-                request_count
-                    .with_label_values(&[ext.as_str(), "error"])
-                    .inc();
+                tracker.fail(RequestPath::PassThrough, RequestStatus::Error);
                 actix_web::error::ErrorInternalServerError("Failed to open file")
             })?;
         let stream = ReaderStream::new(file).map_err(actix_web::error::ErrorInternalServerError);
 
-        request_count.with_label_values(&[ext.as_str(), "ok"]).inc();
+        tracker.ok(RequestPath::PassThrough, size);
         let mut builder = HttpResponse::Ok();
         builder.content_type(content_type);
         builder.insert_header(("Content-Length", size.to_string()));
@@ -209,11 +207,13 @@ pub async fn process_image_request(
     }
 
     let mut image_bytes: Bytes;
+    let mut from_fallback = false;
     if !sanitized_disk_path.exists() {
         // If the file doesn't exist, check if a fallback image URL is configured
         if config.fallback_image_url.is_some()
             && !config.fallback_image_url.as_ref().unwrap().is_empty()
         {
+            from_fallback = true;
             let url = match &config.fallback_image_url {
                 Some(base_url) => format!("{}{}", base_url, sanitized_path.display()),
                 None => sanitized_path.display().to_string(),
@@ -221,6 +221,7 @@ pub async fn process_image_request(
 
             let mut upstream_response = http_client.get(&url).send().await.map_err(|e| {
                 tracing::debug!("Failed to fetch fallback image: {}", e);
+                tracker.fail(RequestPath::Fallback, RequestStatus::BadGateway);
                 actix_web::error::ErrorBadGateway("Failed to fetch fallback image")
             })?;
 
@@ -229,6 +230,7 @@ pub async fn process_image_request(
                     "Failed to fetch fallback image, status: {}",
                     upstream_response.status()
                 );
+                tracker.fail(RequestPath::Fallback, RequestStatus::BadGateway);
                 return Err(actix_web::error::InternalError::new(
                     "Failed to fetch fallback image",
                     upstream_response.status(),
@@ -247,7 +249,8 @@ pub async fn process_image_request(
             // If the upstream fallback image is in the same format as the requested format and no transformations
             // are requested, we can directly stream it without loading it into memory
             if query_params.is_empty() && parsed_format == effective_format {
-                // Return a streaming response for the fallback image if no transformations are requested
+                // Content-Length unknown for streaming fallback; bytes counter skipped.
+                tracker.ok(RequestPath::Fallback, 0);
                 let mut builder = HttpResponse::Ok();
                 builder.content_type(content_type);
                 add_headers_for_caching(&mut builder, &config);
@@ -258,32 +261,55 @@ pub async fn process_image_request(
             image_bytes = upstream_response
                 .body()
                 .limit(config.fallback_image_max_size)
-                .await?;
+                .await
+                .map_err(|e| {
+                    tracing::debug!("Failed to read fallback image body: {}", e);
+                    tracker.fail(RequestPath::Fallback, RequestStatus::BadGateway);
+                    actix_web::error::ErrorBadGateway("Failed to read fallback image body")
+                })?;
         } else {
-            request_count
-                .with_label_values(&[ext.as_str(), "not_found"])
-                .inc();
+            tracker.set_format(ext.clone());
+            tracker.fail(RequestPath::NotFound, RequestStatus::NotFound);
             return Ok(HttpResponse::NotFound().body("File not found"));
         }
     } else {
         // Load the original file bytes from disk
         let path = sanitized_disk_path.clone();
+        let path_if_load_fails = if is_non_processable {
+            RequestPath::NonProcessable
+        } else {
+            RequestPath::Transform
+        };
         image_bytes = load_bytes_from_disk(&path)
             .await
-            .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to read file"))?
+            .map_err(|e| {
+                tracing::error!("Failed to read file: {}", e);
+                tracker.fail(path_if_load_fails, RequestStatus::Error);
+                actix_web::error::ErrorInternalServerError("Failed to read file")
+            })?
             .into();
     }
 
-    // Check if we have a non-processable format that we allow through. If so, return it directly without attempting to process it, even if transformation parameters are present.
-    if !NON_PROCESSABLE_FORMATS.contains(&ext.as_str()) {
+    // path label for the load/transform/non-processable terminal (not cache/pass-through/reject).
+    let path = match (from_fallback, is_non_processable) {
+        (false, false) => RequestPath::Transform,
+        (true, false) => RequestPath::FallbackTransform,
+        (false, true) => RequestPath::NonProcessable,
+        (true, true) => RequestPath::Fallback,
+    };
+
+    // Non-processable formats are returned as-is even if transform query params are present.
+    if !is_non_processable {
         // Offload all CPU-heavy image work (decode + resize + encode) to the blocking threadpool
+        let pipeline_duration = metrics.pipeline_duration.clone();
         let config_for_pipeline = config.clone();
-        let pipeline_duration = pipeline_duration.get_ref().clone();
         let effective_format_clone = effective_format.clone();
+        let input_format = ext.clone();
         let result_image_bytes = web::block(move || -> anyhow::Result<Vec<u8>> {
             let image = {
+                // Decode labeled by input format; encode uses output format in the pipeline.
                 let _timer = pipeline_duration
-                    .with_label_values(&["decode"])
+                    .with_label_values(&["decode", &input_format])
                     .start_timer();
                 crate::utils::decode::decode_image(&image_bytes)?
             };
@@ -299,9 +325,14 @@ pub async fn process_image_request(
             Ok(bytes)
         })
         .await
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Blocking error"))?
+        .map_err(|e| {
+            tracing::error!("Blocking pool error: {:?}", e);
+            tracker.fail(path, RequestStatus::Error);
+            actix_web::error::ErrorInternalServerError("Blocking error")
+        })?
         .map_err(|e| {
             tracing::error!("Image processing error: {:?}", e);
+            tracker.fail(path, RequestStatus::Error);
             actix_web::error::ErrorInternalServerError(format!("Failed to convert image: {}", e))
         })?;
 
@@ -314,9 +345,7 @@ pub async fn process_image_request(
         cache.insert(cache_key, image_bytes.clone());
     }
 
-    request_count
-        .with_label_values(&[effective_format.as_str(), "ok"])
-        .inc();
+    tracker.ok(path, image_bytes.len() as u64);
     let mut builder = HttpResponse::Ok();
     builder.content_type(content_type);
     builder.insert_header((config.cache_status_header.clone(), "MISS"));

@@ -12,8 +12,7 @@ use image_proxy::{
 async fn main() -> anyhow::Result<()> {
     image_proxy::logs::setup_tracing();
     let config = Arc::new(EncodingConfig::from_env());
-    let (prometheus_registry, pipeline_duration, request_count) =
-        image_proxy::metrics::setup_metrics();
+    let (prometheus_registry, app_metrics) = image_proxy::metrics::setup_metrics();
     let hybrid_cache = image_proxy::cache::setup_cache(&config, &prometheus_registry).await?;
 
     HttpServer::new(move || {
@@ -24,8 +23,7 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(config.clone()))
             .app_data(web::Data::new(hybrid_cache.clone()))
             .app_data(web::Data::new(prometheus_registry.clone()))
-            .app_data(web::Data::new(pipeline_duration.clone()))
-            .app_data(web::Data::new(request_count.clone()))
+            .app_data(web::Data::new(app_metrics.clone()))
             .wrap(middleware::Logger::new("%a %r %s %b %D"))
             .service(metrics_handler)
             .service(process_image_request)

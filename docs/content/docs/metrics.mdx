@@ -15,18 +15,35 @@ GET /metrics
 **Response:**
 - Content-Type: `text/plain; version=0.0.4; charset=utf-8`
 
-## Available Metrics
+## Application metrics
 
 ### `image_requests_total`
 
 **Type:** Counter
 
-Tracks the total number of image requests, labeled by output format and result status.
+Tracks the total number of image requests, labeled by output format, result status, and handling path.
 
-| Label    | Values                                                               |
-| -------- | -------------------------------------------------------------------- |
-| `format` | The output image format (e.g., `avif`, `webp`, `jpeg`, `png`, `jxl`) |
-| `status` | `ok`, `not_found`, `unsupported_media_type`, `error`                 |
+| Label    | Values                                                                                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `format` | Closed vocabulary: output/input codec when known (e.g. `avif`, `webp`, `jpeg`, `png`, `jxl`, plus non-processable allow-list like `svg`), or sentinels `unknown` / `unsupported` on validation rejects |
+| `status` | `ok`, `not_found`, `unsupported_media_type`, `error`, `bad_gateway`                                                                                                                                    |
+| `path`   | How the request was handled (see below)                                                                                                                                                                |
+
+**`format` cardinality:** Rejected requests (`path="rejected"`) never use the raw URL extension or free-form `?format=` value as the label — those would be unbounded under probing. They use `unknown` (missing extension) or `unsupported` (disallowed input/output format). The real value remains in the HTTP error body and debug logs.
+
+**`path` values:**
+
+| Value                | Meaning                                                          |
+| -------------------- | ---------------------------------------------------------------- |
+| `cache_hit`          | Served from the response cache                                   |
+| `pass_through`       | Local file streamed without decode/transform                     |
+| `transform`          | Decode + optional resize/BW + encode                             |
+| `non_processable`    | Allowed but non-re-encodable format (svg, gif, …) streamed as-is |
+| `fallback`           | Served from `IMAGE_PROXY_FALLBACK_IMAGE_URL` without transform   |
+| `fallback_transform` | Fallback origin bytes then transform                             |
+| `not_found`          | Missing file and no usable fallback                              |
+| `rejected`           | Validation failure (bad/disallowed format)                       |
+| `unknown`            | Should not appear for completed handlers                         |
 
 **Example queries:**
 
@@ -39,48 +56,134 @@ sum(rate(image_requests_total{status!="ok"}[5m]))
 
 # Ratio of 404s to total requests
 sum(rate(image_requests_total{status="not_found"}[5m])) / sum(rate(image_requests_total[5m]))
+
+# Share of traffic served from cache
+sum(rate(image_requests_total{path="cache_hit"}[5m]))
+  / sum(rate(image_requests_total{status="ok"}[5m]))
+
+# Transform vs free paths
+sum by (path) (rate(image_requests_total{status="ok"}[5m]))
+```
+
+### `image_request_duration_seconds`
+
+**Type:** Histogram
+
+**Handler wall time** from entry until the `HttpResponse` is returned to actix (headers ready / body prepared or stream opened). Includes cache lookup, disk I/O, fallback HTTP, blocking-pool queue time, and transforms when those happen before the response is returned.
+
+For **streaming** pass-through and streaming fallback, this is time-to-response-start only — it does **not** include full body transfer to the client.
+
+| Label    | Same as `image_requests_total` |
+| -------- | ------------------------------ |
+| `format` |                                |
+| `status` |                                |
+| `path`   |                                |
+
+**Histogram buckets:** 0.5ms … 30s
+
+**Example queries:**
+
+```
+# p95 latency overall
+histogram_quantile(0.95, sum by (le) (rate(image_request_duration_seconds_bucket[5m])))
+
+# p95 for expensive transforms only
+histogram_quantile(0.95,
+  sum by (le) (rate(image_request_duration_seconds_bucket{path="transform"}[5m])))
 ```
 
 ### `image_pipeline_step_duration_seconds`
 
 **Type:** Histogram
 
-Tracks the duration of each step in the image processing pipeline.
+Time spent on each CPU-heavy pipeline step (inside `web::block`). Does **not** include cache hits, disk reads, or fallback network time — use `image_request_duration_seconds` for handler-level latency.
 
-| Label  | Values                             |
-| ------ | ---------------------------------- |
-| `step` | `decode`, `resize`, `bw`, `encode` |
+| Label    | Values                                                                  |
+| -------- | ----------------------------------------------------------------------- |
+| `step`   | `decode`, `resize`, `bw`, `encode`                                      |
+| `format` | Input format for `decode`; output format for `resize` / `bw` / `encode` |
+
+The `bw` step is only recorded when `bw=1` is requested.
 
 **Histogram buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
 **Example queries:**
 
 ```
-# Average encode time
+# Average encode time by format
 rate(image_pipeline_step_duration_seconds_sum{step="encode"}[5m])
   / rate(image_pipeline_step_duration_seconds_count{step="encode"}[5m])
 
-# 95th percentile resize time
-histogram_quantile(0.95, rate(image_pipeline_step_duration_seconds_bucket{step="resize"}[5m]))
-
-# Identify slowest pipeline step
-topk(1,
-  rate(image_pipeline_step_duration_seconds_sum[5m])
-    / rate(image_pipeline_step_duration_seconds_count[5m])
-)
+# 95th percentile AVIF encode time
+histogram_quantile(0.95,
+  rate(image_pipeline_step_duration_seconds_bucket{step="encode",format="avif"}[5m]))
 ```
 
-## Monitoring Recommendations
+### `image_response_bytes_total`
 
-Configure your Prometheus server to scrape the `/metrics` endpoint at regular intervals to collect request counts, response times, cache hit/miss rates, and error rates. Set up appropriate alerting based on these metrics to proactively address issues.
+**Type:** Counter
 
-Keep a keen eye on the **cache miss/hit ratio** — a high miss rate may indicate that the cache size is insufficient or that the workload has a large variety of transformations that are not being effectively cached. Adjusting cache settings or analyzing request patterns can significantly reduce server load and improve response times.
+Bytes associated with successful responses (status `ok` only). Labels: `format`, `path`.
 
-## Grafana Dashboard
+- Buffered responses (transform, cache hit, non-processable body): actual body length.
+- Streaming pass-through: **declared** size from file metadata / `Content-Length` at open time — not verified egress if the client disconnects mid-stream.
+- Streaming fallback without a known Content-Length: counter is **not** incremented.
 
-A basic dashboard can be built with these panels:
+```
+# Egress rate (bytes/sec)
+sum(rate(image_response_bytes_total[5m]))
+```
 
-1. **Request Rate** — `rate(image_requests_total[5m])` grouped by `format`
-2. **Error Rate** — `rate(image_requests_total{status!="ok"}[5m])` grouped by `status`
-3. **Pipeline Latency** — `histogram_quantile(0.95, ...)` for each step (`decode`, `resize`, `bw`, `encode`)
-4. **Format Distribution** — `sum by (format)(increase(image_requests_total[1h]))`
+### `image_requests_in_flight`
+
+**Type:** Gauge
+
+Number of image requests currently being handled. Useful as a coarse saturation signal under transform load.
+
+## Process metrics (Linux)
+
+When built on Linux with the Prometheus `process` feature (enabled by default in this project), standard process collectors are registered on the same registry, for example:
+
+- `process_cpu_seconds_total`
+- `process_resident_memory_bytes`
+- `process_open_fds`
+
+## Cache metrics (foyer)
+
+When `IMAGE_PROXY_ENABLE_CACHE=true`, foyer registers hybrid memory/disk cache metrics on the same `/metrics` endpoint via mixtrics. Names are prefixed with `foyer_`, including:
+
+| Metric                                        | Notes                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `foyer_hybrid_op_total`                       | Hybrid cache ops (`hit`, `miss`, `insert`, …), labels `name`, `op` |
+| `foyer_memory_op_total`                       | In-memory ops (`hit`, `miss`, `evict`, …)                          |
+| `foyer_memory_usage` / `foyer_memory_entries` | Memory cache occupancy                                             |
+| `foyer_storage_*`                             | Disk cache I/O and occupancy (when disk cache is enabled)          |
+
+Prefer **application** `path="cache_hit"` for “fraction of image requests served from cache”, and foyer metrics for cache-internal health (evictions, disk I/O, memory usage). Foyer series are absent when caching is disabled.
+
+```
+# Foyer hybrid hit ratio (when cache enabled)
+sum(rate(foyer_hybrid_op_total{op="hit"}[5m]))
+  / sum(rate(foyer_hybrid_op_total{op=~"hit|miss"}[5m]))
+```
+
+## Monitoring recommendations
+
+1. **Traffic & errors** — `rate(image_requests_total[5m])` by `status` and `path`.
+2. **Latency SLI** — p95/p99 of `image_request_duration_seconds` (handler time; for streaming paths this is time to response start, not full body transfer).
+3. **CPU bottlenecks** — pipeline step histograms, especially `encode` broken down by `format`.
+4. **Cache effectiveness** — app `path=cache_hit` ratio + foyer memory usage / hit rate.
+5. **Saturation** — `image_requests_in_flight` rising with latency, and process CPU/RSS.
+6. **Fallback origin** — watch `path=~"fallback.*"` and `status="bad_gateway"`.
+
+Keep a keen eye on the **cache hit ratio** — a high miss rate may indicate that the cache size is insufficient or that the workload has a large variety of transformations that are not being effectively cached.
+
+## Grafana dashboard ideas
+
+1. **Request rate** — `rate(image_requests_total[5m])` by `format` / `path`
+2. **Error rate** — `rate(image_requests_total{status!="ok"}[5m])` by `status`
+3. **E2E latency** — `histogram_quantile(0.95, …)` on `image_request_duration_seconds`
+4. **Pipeline latency** — p95 for each `step` (and encode by `format`)
+5. **Bytes served** — `rate(image_response_bytes_total[5m])`
+6. **In-flight** — `image_requests_in_flight`
+7. **Cache** — foyer hit/miss + memory usage (when enabled)

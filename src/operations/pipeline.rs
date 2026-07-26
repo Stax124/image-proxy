@@ -21,16 +21,20 @@ pub fn image_pipeline(
     black_and_white: bool,
     pipeline_duration: Option<&HistogramVec>,
 ) -> anyhow::Result<Vec<u8>> {
+    // Labels: step, format. Format is meaningful for encode (and kept consistent for all steps).
     let image = {
-        let _timer = pipeline_duration.map(|h| h.with_label_values(&["resize"]).start_timer());
+        let _timer =
+            pipeline_duration.map(|h| h.with_label_values(&["resize", format]).start_timer());
         resize_image(image, size, resize_algorithm, config)
     };
 
-    let image = {
-        let _timer = pipeline_duration.map(|h| h.with_label_values(&["bw"]).start_timer());
-        apply_bw(image, black_and_white)
+    let image = if black_and_white {
+        let _timer = pipeline_duration.map(|h| h.with_label_values(&["bw", format]).start_timer());
+        apply_bw(image, true)
+    } else {
+        image
     };
 
-    let _timer = pipeline_duration.map(|h| h.with_label_values(&["encode"]).start_timer());
+    let _timer = pipeline_duration.map(|h| h.with_label_values(&["encode", format]).start_timer());
     convert_image_format(image, Some(format), config)
 }
