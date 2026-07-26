@@ -127,13 +127,14 @@ Requests for formats not in this list will receive a `415 Unsupported Media Type
 
 ## Resize Algorithms
 
-Four resize algorithms are available, configurable globally via `IMAGE_PROXY_RESIZE_ALGORITHM` or per-request via the `resize_algorithm` query parameter:
+Five resize algorithms are available, configurable globally via `IMAGE_PROXY_RESIZE_ALGORITHM` or per-request via the `resize_algorithm` query parameter:
 
 | Algorithm   | Description                                                                                                                                                                 |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auto`      | Automatically selects the best algorithm based on the scale factor. Uses `thumbnail` for scales below 50% of the original longest edge, `lanczos3` otherwise. **(default)** |
 | `lanczos3`  | High-quality Lanczos resampling. Best for moderate size reductions.                                                                                                         |
 | `bicubic`   | Cubic (Catmull-Rom) resampling. Good quality/speed tradeoff between `lanczos3` and `thumbnail`.                                                                             |
+| `gaussian`  | Gaussian resampling. Smoother result with less ringing than `lanczos3`.                                                                                                     |
 | `thumbnail` | Fast box/nearest-neighbor resampling. Best for large downscales.                                                                                                            |
 
 Resizing maintains aspect ratio using a bounding-box constraint and **never upscales** beyond the original dimensions.

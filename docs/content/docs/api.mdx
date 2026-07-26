@@ -19,7 +19,7 @@ Serves an image from the configured root path, optionally applying transformatio
 | `format`           | `string` | Output format: `avif`, `jpeg`, `jpg`, `jxl`, `png`, `webp`                           |
 | `size`             | `u32`    | Maximum bounding-box dimension in pixels. Maintains aspect ratio. Does not upscale.  |
 | `dpr`              | `f64`    | Device pixel ratio (1.0–10.0). Multiplies `size` to produce actual output dimension. |
-| `resize_algorithm` | `string` | Resize algorithm override: `lanczos3`, `bicubic`, `thumbnail`, `auto`                |
+| `resize_algorithm` | `string` | Resize algorithm override: `lanczos3`, `bicubic`, `gaussian`, `thumbnail`, `auto`    |
 | `bw`               | `0`/`1`  | Convert to black-and-white via luminance grayscale. Only `1` enables; other values leave color. |
 
 ### Request Headers

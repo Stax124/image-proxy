@@ -11,6 +11,8 @@ pub enum ResizeAlgorithm {
     Thumbnail,
     /// Cubic (Catmull-Rom) resampling — good quality/speed tradeoff vs Lanczos3.
     Bicubic,
+    /// Gaussian resampling — smoother result, less ringing than Lanczos3.
+    Gaussian,
     /// Choose automatically: use `Thumbnail` for large downscales (< 50 % of
     /// the original longest edge), otherwise `Lanczos3`.
     Auto,
@@ -24,6 +26,7 @@ impl FromStr for ResizeAlgorithm {
             "lanczos3" => Ok(Self::Lanczos3),
             "thumbnail" => Ok(Self::Thumbnail),
             "bicubic" => Ok(Self::Bicubic),
+            "gaussian" => Ok(Self::Gaussian),
             "auto" => Ok(Self::Auto),
             _ => Err(()),
         }
@@ -88,6 +91,7 @@ fn filter_type(algorithm: ResizeAlgorithm) -> Option<image::imageops::FilterType
     match algorithm {
         ResizeAlgorithm::Lanczos3 => Some(image::imageops::FilterType::Lanczos3),
         ResizeAlgorithm::Bicubic => Some(image::imageops::FilterType::CatmullRom),
+        ResizeAlgorithm::Gaussian => Some(image::imageops::FilterType::Gaussian),
         ResizeAlgorithm::Thumbnail | ResizeAlgorithm::Auto => None,
     }
 }
@@ -149,6 +153,14 @@ mod tests {
     }
 
     #[test]
+    fn from_str_gaussian() {
+        assert_eq!(
+            ResizeAlgorithm::from_str("gaussian"),
+            Ok(ResizeAlgorithm::Gaussian)
+        );
+    }
+
+    #[test]
     fn from_str_case_insensitive() {
         assert_eq!(
             ResizeAlgorithm::from_str("LANCZOS3"),
@@ -161,6 +173,10 @@ mod tests {
         assert_eq!(
             ResizeAlgorithm::from_str("Bicubic"),
             Ok(ResizeAlgorithm::Bicubic)
+        );
+        assert_eq!(
+            ResizeAlgorithm::from_str("Gaussian"),
+            Ok(ResizeAlgorithm::Gaussian)
         );
         assert_eq!(ResizeAlgorithm::from_str("AUTO"), Ok(ResizeAlgorithm::Auto));
     }
@@ -264,6 +280,26 @@ mod tests {
         let img = make_image(500, 1000);
         let config = test_config();
         let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Bicubic), &config);
+
+        assert_eq!(result.height(), 400);
+        assert_eq!(result.width(), 200);
+    }
+
+    #[test]
+    fn resize_gaussian_landscape() {
+        let img = make_image(1000, 500);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Gaussian), &config);
+
+        assert_eq!(result.width(), 400);
+        assert_eq!(result.height(), 200);
+    }
+
+    #[test]
+    fn resize_gaussian_portrait() {
+        let img = make_image(500, 1000);
+        let config = test_config();
+        let result = resize_image(img, Some(400), Some(ResizeAlgorithm::Gaussian), &config);
 
         assert_eq!(result.height(), 400);
         assert_eq!(result.width(), 200);

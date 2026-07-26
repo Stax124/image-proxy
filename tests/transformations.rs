@@ -216,7 +216,7 @@ async fn resize_algorithm_param_is_accepted() {
     let config = test_config(dir.path().to_str().unwrap());
     let app = init_test_app!(config);
 
-    for alg in ["thumbnail", "lanczos3", "bicubic", "auto"] {
+    for alg in ["thumbnail", "lanczos3", "bicubic", "gaussian", "auto"] {
         let req = test::TestRequest::get()
             .uri(&format!("/photo.jpeg?size=4&resize_algorithm={}", alg))
             .to_request();
