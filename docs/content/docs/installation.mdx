@@ -12,6 +12,8 @@ First, take the `examples/docker-compose.yml` file and copy it anywhere you like
 docker compose up
 ```
 
+The runtime image installs **jemalloc** and sets `LD_PRELOAD` / `MALLOC_CONF` so all allocations (including native image codecs) use jemalloc. This keeps post-load RSS from remaining inflated after concurrent transforms. See [Development](./development#memory-allocator-jemalloc) for the same env vars when running a local binary.
+
 ## Building from Source
 
 ### Prerequisites

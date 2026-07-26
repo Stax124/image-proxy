@@ -56,7 +56,10 @@ FROM docker.io/library/alpine:3.23 AS runtime
 # Create a non-privileged user (recommended best practice)
 ARG UID=1000
 
-RUN apk add --no-cache libdav1d libgcc libjxl
+# jemalloc: full-process allocator via LD_PRELOAD (Rust + native codecs).
+# Returns free pages after concurrent image encode/decode free storms more
+# aggressively than the system multi-arena malloc.
+RUN apk add --no-cache libdav1d libgcc libjxl jemalloc
 
 RUN adduser \
     --disabled-password \
@@ -78,6 +81,12 @@ COPY --from=builder /bin/image-proxy /bin/image-proxy
 
 # Document the port your app listens on.
 EXPOSE 8000
+
+# Intercept all malloc/free (including libwebp/libjxl/dav1d).
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
+# background_thread: purge dirty pages without waiting for the next alloc storm
+# dirty/muzzy_decay_ms: return free pages to the OS ~1s after they become idle
+ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:1000
 
 # Start the application.
 CMD ["/bin/image-proxy"]

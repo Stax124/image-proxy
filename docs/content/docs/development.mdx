@@ -16,6 +16,26 @@ IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=DEBUG cargo run --release
 - `RUST_LOG=DEBUG` — Enables detailed logs about request handling and transformations. Highly recommended when testing new features or troubleshooting.
 - `cargo run --release` — Release mode is important for realistic performance testing, especially for image transformations (debug mode is significantly slower, particularly for AVIF encoding).
 
+## Memory allocator (jemalloc)
+
+Docker images run with **jemalloc** via `LD_PRELOAD` so post-load RSS returns to the OS after heavy concurrent transforms (decode/resize/encode). Local `cargo run` uses the system allocator by default; that is fine for development.
+
+To force jemalloc locally (same approach as production), install the package (`jemalloc` on Arch/Debian/Alpine) and:
+
+```bash
+# Arch / most systems
+export LD_PRELOAD=/usr/lib/libjemalloc.so.2
+# Debian/Ubuntu multiarch (if the path above is missing):
+# export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+
+# Optional: return free pages ~1s after they become idle (matches the Docker image)
+export MALLOC_CONF=background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:1000
+
+IMAGE_PROXY_ROOT_PATH=./data/images RUST_LOG=DEBUG cargo run --release
+```
+
+`LD_PRELOAD` covers the whole process (Rust + native codecs such as libwebp/libjxl/dav1d). Without it, residual RSS after load tests can stay high due to multi-arena system malloc.
+
 ## Benchmarking
 
 To measure how many images per second the proxy can process on the current machine, use the built-in benchmark example (always run with `--release`):
